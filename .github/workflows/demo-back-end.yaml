@@ -1,0 +1,153 @@
+# demo back-end 배포: main에 back-end 변경이 들어오면(push, PR 머지)
+# 테스트 → arm64 이미지 빌드 → ECR 푸시 → infra/gitops에 이미지 다이제스트 커밋 → Argo CD가 반영
+# 흐름과 결정: docs/adr/0003-delivery-pipeline.md, infra/README.md "앱 배포 워크플로"
+name: demo-back-end
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - back-end/**
+      - '!back-end/**/*.md' # 문서만 바뀌면 배포하지 않는다
+      - .github/workflows/demo-back-end.yaml
+  workflow_dispatch: # 같은 커밋을 다시 배포할 때
+
+# 같은 앱의 배포는 한 번에 하나씩, 들어온 순서대로 한다.
+# 진행 중인 배포를 취소하지 않아야 오래된 다이제스트가 새 다이제스트를 덮어쓰지 않는다
+concurrency:
+  group: demo-back-end
+  cancel-in-progress: false
+
+permissions: {} # job마다 필요한 권한만 연다
+
+env:
+  APP_DIR: back-end
+  ECR_REPOSITORY: restella-demo/back-end
+  AWS_REGION: ap-northeast-2
+  NODE_VERSION: 24.21.0 # Dockerfile의 node 이미지와 같은 버전
+  VALUES_FILE: infra/gitops/values/demo/back-end-image.yaml
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: back-end
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: back-end/package.json # packageManager(pnpm 12.10.1)를 읽는다
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: back-end/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - name: 단위 테스트
+        run: pnpm test
+      - name: 통합·E2E 테스트 (Testcontainers로 실제 MariaDB, 동시성 불변식 포함)
+        run: pnpm test:e2e
+
+  build:
+    needs: test
+    if: github.ref == 'refs/heads/main' # AWS 역할도 main에서만 맡을 수 있다
+    runs-on: ubuntu-24.04-arm # demo 노드(t4g)와 같은 arm64에서 네이티브로 빌드한다 (QEMU 에뮬레이션 없음)
+    permissions:
+      contents: read
+      id-token: write # OIDC로 AWS 역할을 맡는다 (장기 액세스 키 없음)
+    outputs:
+      digest: ${{ steps.result.outputs.digest }} # 다이제스트만 넘긴다. 레지스트리 주소에는 계정 ID가 있다
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_DEMO }} # 역할 ARN에 계정 ID가 있어 저장소 Secret에 둔다
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true # 공개 저장소의 Actions 로그는 누구나 본다. 기본값은 가리지 않는다
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+
+      # ECR은 태그 덮어쓰기를 막는다. 같은 커밋을 다시 실행하면 이미 올린 이미지를 쓴다
+      - id: existing
+        name: 같은 커밋의 이미지가 이미 있는지 확인
+        run: |
+          digest=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text 2> /dev/null || true)
+          if [[ "$digest" == sha256:* ]]; then
+            echo "이미 있다: $digest"
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.existing.outputs.digest == ''
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - id: build
+        if: steps.existing.outputs.digest == ''
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ env.APP_DIR }}
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          # 단일 이미지 매니페스트로 올린다. 증명(attestation)을 붙이면 이미지 인덱스와 태그 없는 하위 매니페스트가 생기는데,
+          # ECR 수명 주기 규칙("태그 없는 이미지 하루 뒤 삭제")과 섞이지 않게 한다
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=demo-back-end
+          cache-to: type=gha,scope=demo-back-end,mode=max
+
+      - id: result
+        name: 배포할 다이제스트
+        env:
+          EXISTING: ${{ steps.existing.outputs.digest }}
+          BUILT: ${{ steps.build.outputs.digest }}
+        run: |
+          digest="${EXISTING:-$BUILT}"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "다이제스트 형식이 아니다: $digest" >&2; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # gitops 값 파일을 main에 커밋한다. 이 토큰의 커밋은 워크플로를 다시 실행하지 않는다
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main # 빌드하는 동안 main이 앞으로 갔을 수 있다. 최신 main 위에 커밋한다
+      - name: gitops에 이미지 다이제스트 기록
+        env:
+          DIGEST: ${{ needs.build.outputs.digest }}
+        run: |
+          mkdir -p "$(dirname "$VALUES_FILE")"
+          cat > "$VALUES_FILE" <<EOF
+          # CI가 갱신한다 (.github/workflows/demo-back-end.yaml). 손으로 고치지 않는다.
+          # 레지스트리 주소(AWS 계정 ID 포함)는 공개 저장소에 두지 않는다 (infra/README.md "앱 배포 워크플로")
+          image:
+            repository: ${ECR_REPOSITORY}
+            tag: "${GITHUB_SHA}"
+            digest: "${DIGEST}"
+          EOF
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$VALUES_FILE"
+          if git diff --cached --quiet; then
+            echo "이미 이 다이제스트가 기록돼 있다"
+            exit 0
+          fi
+          git commit -m "deploy(demo): back-end ${GITHUB_SHA::7}" -m "image digest ${DIGEST}"
+          # front-end 배포 커밋과 겹치면 최신 main을 다시 받아 올린다. 서로 다른 파일이라 충돌하지 않는다
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then exit 0; fi
+            echo "push 실패 (${attempt}/5). 최신 main 위로 다시 올린다"
+            git pull --rebase origin main
+          done
+          exit 1
