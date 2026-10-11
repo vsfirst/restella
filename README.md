@@ -24,7 +24,7 @@ flowchart LR
 | 2. 디자인 | 화면 설계는 레포 안 HTML 목업으로. 시뮬레이터는 back-end 안 모듈로. 설계 확정 | 도메인 모델·잠금 순서·API 설계. 동시성·중복·동기화·실시간 알림 방식 비교([ADR-0004](docs/adr/0004-reservation-consistency-and-sync.md)). 목업과 스크린샷 10장 | 완료 |
 | 3. 개발 | DTO는 NestJS 관례대로. FSD `entities`·`features` 없애고 `widgets`는 유지. 오류 응답은 RFC 9457 | back-end 모듈 9개, front-end 화면 7개와 BFF, 컨테이너 이미지 | 완료. 코드 리뷰 대기 |
 | 4. 테스트 | 결과 확인 | 불변식 테스트를 먼저 작성. 동시성은 실제 MariaDB로, 시연 시나리오는 실제 브라우저로 검증. 테스트로 문제 12건을 찾아 고침 | 로컬 완료. demo 배포·HTTPS 확인. 부하(p95)·스팟 회수 복구·되돌리기 검증 남음 |
-| 인프라 | demo(실제 배포)와 prod(코드만) 분리. OS는 Amazon Linux 2023(AI는 Ubuntu 추천). t4g.large 스팟. Route 53은 공용 `global` 스택으로. 비밀값은 1개에 `fe`·`be` 키 2개. 워크플로는 앱별로. 노드는 gitops 준비 뒤에 | Terraform(bootstrap·global·demo 모두 적용), 앱별 CI 워크플로(테스트 → arm64 빌드 → ECR → 다이제스트 커밋), Helm 차트 4개(front-end·back-end·mariadb·cluster-config), Argo CD·ESO·cert-manager 구성과 demo 배포(Let's Encrypt HTTPS). 같은 버전의 k3s를 로컬에 띄워 먼저 검증. 결정 기록([ADR-0001~0003, 0005](docs/adr/)) | 진행 중. demo 배포 완료. 모니터링·prod 코드 남음 |
+| 인프라 | demo(실제 배포)와 prod(코드만) 분리. OS는 Amazon Linux 2023(AI는 Ubuntu 추천). t4g.large 스팟. Route 53은 공용 `global` 스택으로. 비밀값은 1개에 `fe`·`be` 키 2개. 워크플로는 앱별로. 노드는 gitops 준비 뒤에 | Terraform(bootstrap·global·demo 모두 적용), 앱별 CI 워크플로(테스트 → arm64 빌드 → ECR → 다이제스트 커밋), Helm 차트 5개(front-end·back-end·mariadb·cluster-config·monitoring-config), Argo CD·ESO·cert-manager 구성과 demo 배포(Let's Encrypt HTTPS), Prometheus·Grafana 모니터링과 Restella 대시보드. 같은 버전의 k3s를 로컬에 띄워 먼저 검증. 결정 기록([ADR-0001~0003, 0005](docs/adr/)) | 진행 중. demo 배포·모니터링 완료. prod 코드 남음 |
 
 ### AI 결과를 검증한 방법
 
@@ -303,7 +303,7 @@ flowchart LR
 | 운영자 콘솔 (front-end) | "마지막 1실" 시연 시나리오 전체를 실제 브라우저로 검증. 충돌 알림이 새로고침 없이 5초 안에 뜨고, 5개 채널 모두 판매 중지를 받음 |
 | 차트 검증 | 같은 버전 k3s(v1.36.5)를 로컬 Docker에 띄워 차트를 배포하고 Playwright E2E 통과 |
 | CI | 앱별 워크플로가 테스트 → arm64 빌드 → ECR 푸시 → 이미지 다이제스트 커밋까지 성공 |
-| demo 배포 (AWS) | `fe.`·`api.` 도메인에 Let's Encrypt 인증서 발급, HTTP는 301로 HTTPS 이동. Argo CD Application 8개 모두 Synced/Healthy, 마이그레이션·시드 Job 완료 |
+| demo 배포 (AWS) | `fe.`·`api.` 도메인에 Let's Encrypt 인증서 발급, HTTP는 301로 HTTPS 이동. Argo CD Application 9개 모두 Synced/Healthy, 마이그레이션·시드 Job 완료. Grafana(`grafana.` 도메인, 익명 읽기 전용)에서 back-end 지표 수집 확인 |
 
 자세한 내용은 [테스트 결과 보고서](docs/4-testing/test-report.md)에 있다.
 
@@ -336,7 +336,8 @@ flowchart LR
     FE -->|REST + 액세스 토큰| CORE
     CORE --> DB
     ING -->|"api.&lt;도메인&gt;<br/>채널 API · 문서"| CORE
-    PROM["Prometheus · Grafana<br/>(구성 예정)"] -. 지표 수집 .-> CORE
+    PROM["Prometheus · Grafana"] -. 지표 수집 .-> CORE
+    ING -->|"grafana.&lt;도메인&gt;<br/>읽기 전용"| PROM
     ARGO[Argo CD]
   end
   CI[GitHub Actions] -->|이미지 푸시| ECR[(ECR)]
@@ -352,7 +353,7 @@ flowchart LR
 | front-end | 운영자 콘솔. 세션을 보관하고 back-end API를 대신 호출하는 BFF | Next.js, iron-session, TanStack Query, Tailwind CSS, FSD |
 | back-end | 재고 원장, 예약 수신·취소, 채널 동기화, 충돌 관리. 채널을 흉내 내는 `simulator` 모듈도 이 앱 안에 있다 | NestJS, TypeORM, Swagger |
 | DB | 재고, 예약, 충돌, 이벤트 저장 | MariaDB |
-| infra | EC2 1대 위의 k3s 클러스터, GitOps 배포, HTTPS, 모니터링(구성 예정) | Terraform, k3s, Helm, Argo CD, cert-manager, Traefik, (예정) Prometheus·Grafana |
+| infra | EC2 1대 위의 k3s 클러스터, GitOps 배포, HTTPS, 모니터링 | Terraform, k3s, Helm, Argo CD, cert-manager, Traefik, Prometheus, Grafana |
 | CI | 테스트, 이미지 빌드·푸시, 이미지 다이제스트를 gitops에 반영 | GitHub Actions, ECR |
 | 비밀값 | DB 비밀번호, 세션 키 등을 클러스터에 전달 | AWS Secrets Manager, External Secrets Operator |
 

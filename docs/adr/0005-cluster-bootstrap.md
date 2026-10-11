@@ -43,7 +43,7 @@
 
 ## 결정 3: 인스턴스 메타데이터는 네임스페이스마다 NetworkPolicy로 막는다
 
-- Kubernetes NetworkPolicy에는 클러스터 전체 정책이 없다. 그래서 `cluster-config`가 지정한 네임스페이스(`restella`, `argocd`, `kube-system`, `cert-manager`)마다 "169.254.169.254만 빼고 나가는 트래픽 허용" 정책을 둔다. `external-secrets` 네임스페이스는 넣지 않는다.
+- Kubernetes NetworkPolicy에는 클러스터 전체 정책이 없다. 그래서 `cluster-config`가 지정한 네임스페이스(`restella`, `argocd`, `kube-system`, `cert-manager`, `monitoring`)마다 "169.254.169.254만 빼고 나가는 트래픽 허용" 정책을 둔다. `external-secrets` 네임스페이스는 넣지 않는다.
 - 자체 정책이 더 엄격한 Pod(MariaDB: 나가는 트래픽 전부 차단)는 고르지 않는다. NetworkPolicy는 허용 규칙이 합쳐지므로, 고르면 오히려 느슨해진다.
 - **한계:** 새 네임스페이스를 만들면 목록에 직접 추가해야 한다. 빠뜨리면 그 네임스페이스의 Pod는 노드 역할(ECR 읽기, `restella-demo` 비밀값 읽기)을 얻을 수 있다.
 

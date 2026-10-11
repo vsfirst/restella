@@ -38,7 +38,7 @@
 | NFR-02 응답 시간 | 동기 시뮬레이션, 연결 풀 30 | `simulator` AC-N02-2 (50건 < 10초) | ✅ N02-2 / ⏳ N02-1 (demo 부하 측정) |
 | NFR-03 보안 | HMAC 서명, 입력 검증(모르는 필드 거절), gitleaks, `.dockerignore`, 비밀값은 ESO로 실행 시점 주입, Traefik HTTPS 리디렉션 + cert-manager(Let's Encrypt) | `channel-auth` AC-N03-3, demo에서 HTTP 301·인증서 확인(2026-10-11) | ✅ N03-1(검토)·N03-2·N03-3 |
 | NFR-04 개인정보 | 스키마에 이름만 있고 연락처 컬럼이 없다. 시드는 가짜 값 | 스키마·시드 검토 | ✅ (검토) |
-| NFR-05 관측 | `/metrics` (prom-client) | `auth-and-observability` AC-N05-1 | ✅ 지표 / ⏳ 대시보드 (모니터링 미구성) |
+| NFR-05 관측 | `/metrics` (prom-client), kube-prometheus-stack(Prometheus·Grafana), Restella 대시보드(`charts/monitoring-config`) | `auth-and-observability` AC-N05-1, demo Grafana 확인(2026-10-11) | ✅ 지표·대시보드 |
 | NFR-06 배포 | `.github/workflows/demo-*.yaml`이 다이제스트를 `values/demo/*-image.yaml`에 커밋, 차트는 `@sha256:` 참조, Argo CD 자동 동기화(selfHeal) | 2026-10-11 CI 실행과 Argo CD 동기화 | ✅ N06-1 / ⏳ N06-2 (되돌리기) |
 | NFR-07 복구 | 스팟 `persistent`·회수 시 `stop`, DLM 일일 스냅샷 7개 보관 (적용됨) | — | ⏳ N07-1 (스팟 회수 시험) / ⏳ N07-2 (스냅샷 생성 확인) |
 | NFR-08 날짜 기준 | DATE를 문자열로 다룸(`dateStrings`), 서울 기준 오늘 계산 | `stay-dates.spec.ts` "서버 시간대와 무관" | ✅ |

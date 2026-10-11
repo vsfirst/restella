@@ -90,8 +90,9 @@
 - **로컬 k3s:** demo와 같은 k3s v1.36.5를 Docker에 띄워 차트를 배포하고, 배포된 front-end 차트를 대상으로 Playwright E2E 2개가 통과했다. 세부 내용은 [infra 설계](../../infra/README.md)의 차트별 "검증"에 있다.
 - **demo 배포:** t4g.large 스팟 노드 1대(k3s v1.36.5, Argo CD 3.5.4, ESO 2.12.0, cert-manager v1.21.2, Traefik 3.7.13). Application 8개 모두 Synced/Healthy, mariadb·back-end·front-end Pod 실행, 마이그레이션·시드 Job 완료.
 - **HTTPS:** `fe.`·`api.` 도메인에 Let's Encrypt 인증서가 발급됐고, HTTP 요청은 301로 HTTPS에 넘어간다(AC-N03-2).
+- **모니터링:** `grafana.` 도메인에 Let's Encrypt 인증서가 발급됐다. 로그인 없이 Restella 대시보드를 조회할 수 있고, 익명 편집 시도는 403이다. Prometheus가 back-end `/metrics`를 수집한다(`up=1`, 예약 결과 지표 확인, AC-N05-1).
 - **CI:** `demo-back-end`·`demo-front-end` 워크플로가 테스트 → arm64 빌드 → ECR 푸시 → 이미지 다이제스트 커밋까지 성공했다(AC-N06-1). 공개된 Actions 로그에 AWS 계정 ID가 그대로 찍힌 줄은 없다.
 
 ## 남은 검증
 
-- 인프라: demo 환경에서 응답 시간 p95(AC-N02-1), 이전 커밋으로 되돌리기(AC-N06-2), 스팟 회수 후 복구(AC-N07-1), 일일 스냅샷 생성(AC-N07-2), 실제 노드에서 인스턴스 메타데이터 차단, Grafana 대시보드(AC-N05-1, 모니터링 구성 후)를 확인한다.
+- 인프라: demo 환경에서 응답 시간 p95(AC-N02-1), 이전 커밋으로 되돌리기(AC-N06-2), 스팟 회수 후 복구(AC-N07-1), 일일 스냅샷 생성(AC-N07-2), 실제 노드에서 인스턴스 메타데이터 차단을 확인한다.

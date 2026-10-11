@@ -2,7 +2,7 @@
 
 Restella를 AWS EC2 위의 k3s 클러스터에 배포하는 인프라 코드다. AWS 리소스는 Terraform으로, 클러스터 안의 구성은 Argo CD 기반 GitOps로 관리한다.
 
-- 기술: Terraform, k3s, Helm, Argo CD, External Secrets Operator, cert-manager (모니터링 Prometheus·Grafana는 아직 구성하지 않았다)
+- 기술: Terraform, k3s, Helm, Argo CD, External Secrets Operator, cert-manager, Prometheus·Grafana(kube-prometheus-stack)
 - 버전: [기술 스택](../docs/2-design/tech-stack.md)
 - 네트워크 구성 결정: [ADR-0001](../docs/adr/0001-network-topology.md)
 - demo 노드의 OS와 인스턴스 결정: [ADR-0002](../docs/adr/0002-demo-node-os-and-instance.md)
@@ -52,9 +52,9 @@ infra/
 └── gitops/                 # Argo CD가 감시하는 디렉토리
     ├── bootstrap/          # Argo CD 설치 정의(k3s HelmChart)와 환경별 루트 Application (스크립트만 적용)
     ├── apps/
-    │   ├── demo/           # argocd-bootstrap, external-secrets, cert-manager, cluster-config, mariadb, back-end·front-end(ApplicationSet)
+    │   ├── demo/           # argocd-bootstrap, external-secrets, cert-manager, cluster-config, mariadb, back-end·front-end·monitoring(ApplicationSet)
     │   └── prod/           # (미작성)
-    ├── charts/             # 자체 Helm 차트: cluster-config, front-end, back-end, mariadb(공식 이미지 기반 StatefulSet)
+    ├── charts/             # 자체 Helm 차트: cluster-config, front-end, back-end, mariadb(공식 이미지 기반 StatefulSet), monitoring-config
     └── values/
         ├── demo/           # 환경별 values, CI가 쓰는 <앱>-image.yaml
         └── prod/           # (미작성)
@@ -75,7 +75,7 @@ infra/
 | 디스크 | 루트 gp3 20GiB와 데이터 gp3 10GiB, 모두 암호화. 데이터 볼륨은 인스턴스와 수명을 분리해 k3s 로컬 볼륨 경로(`/var/lib/rancher/k3s/storage`)에 마운트한다 |
 | 백업 | Data Lifecycle Manager가 데이터 볼륨을 매일 KST 03:00에 스냅샷하고 7개를 보관한다 |
 | 접속 | SSM Session Manager만 쓴다. SSH 키와 22번 포트는 없다 |
-| IMDS | IMDSv2만 허용한다. 모듈 기본 홉 제한은 1(Pod가 인스턴스 역할에 접근 불가)이고, demo는 External Secrets Operator를 위해 2로 올린다. 대신 cluster-config가 지정한 네임스페이스(restella, argocd, kube-system, cert-manager)마다 NetworkPolicy로 메타데이터 주소를 막는다. 새 네임스페이스는 직접 추가해야 한다([ADR-0005 결정 3](../docs/adr/0005-cluster-bootstrap.md#결정-3-인스턴스-메타데이터는-네임스페이스마다-networkpolicy로-막는다). 실제 노드에서 차단 확인은 남음) |
+| IMDS | IMDSv2만 허용한다. 모듈 기본 홉 제한은 1(Pod가 인스턴스 역할에 접근 불가)이고, demo는 External Secrets Operator를 위해 2로 올린다. 대신 cluster-config가 지정한 네임스페이스(restella, argocd, kube-system, cert-manager, monitoring)마다 NetworkPolicy로 메타데이터 주소를 막는다. 새 네임스페이스는 직접 추가해야 한다([ADR-0005 결정 3](../docs/adr/0005-cluster-bootstrap.md#결정-3-인스턴스-메타데이터는-네임스페이스마다-networkpolicy로-막는다). 실제 노드에서 차단 확인은 남음) |
 | k3s | 버전 고정(`v1.36.5+k3s1`), Secret 저장 시 암호화(`secrets-encryption`), kubeconfig 권한 0600 |
 | 로그 | 루트 볼륨이 넘치지 않게 상한을 두고, 넘으면 오래된 로그부터 지운다. OS·k3s 로그(journald, AL2023은 rsyslog 없음)는 500MB·14일, 컨테이너 로그는 kubelet이 10Mi × 3개, k3s 내장 containerd 로그(`/var/lib/rancher/k3s/agent/containerd/containerd.log`)는 k3s가 50MB × 3개·28일로 로테이션한다(k3s 코드에 고정). 앞의 둘은 노드가 생길 때 user-data로 설정하므로, 바꾸려면 노드를 교체하거나 SSM으로 직접 고친다 |
 | DNS | 호스팅 영역 이름과 그 하위 이름 전체(`*.`)를 노드의 EIP로 보낸다. 영역 자체는 `global`이 관리한다 |
@@ -240,6 +240,26 @@ PRINT_ONLY=1 infra/scripts/bootstrap-demo-argocd.sh    # 노드에서 실행할 
 - **경로:** Traefik → 앱 경로가 NetworkPolicy를 통과했다. `api.` 주소에서는 문서와 채널 API(서명 없으면 401)만 열리고 운영자 API·시뮬레이터 수신 주소·`/metrics`·헬스체크는 404였다.
 - **demo 노드 (2026-10-11):** 실제 발급자 `letsencrypt`로 `fe.`·`api.` 인증서가 발급됐다.
 
+## gitops: 모니터링 (`apps/demo/monitoring.yaml`)
+
+| 파일 | 내용 |
+|---|---|
+| [`apps/demo/monitoring.yaml`](gitops/apps/demo/monitoring.yaml) | ApplicationSet(wave 1). kube-prometheus-stack 92.3.0 + `monitoring-config`. `grafana.<도메인>`과 root_url을 클러스터 Secret annotation에서 넣는다 |
+| [`values/demo/monitoring.yaml`](gitops/values/demo/monitoring.yaml) | Prometheus 3.13.4(LTS) 7일·3GB 보관(PVC 5Gi), Alertmanager와 k3s 내장 컴포넌트 수집 끔, Grafana 익명 Viewer·HTTPS |
+| [`charts/monitoring-config`](gitops/charts/monitoring-config) | Grafana 관리자 비밀번호(ESO Password 생성기, 한 번만 생성), Restella 대시보드(ConfigMap) |
+| back-end 차트 `monitoring.serviceMonitor` | Prometheus가 back-end `/metrics`를 30초마다 수집. back-end NetworkPolicy가 monitoring의 Prometheus만 3000 포트를 더 허용 |
+
+| 결정 | 이유 |
+|---|---|
+| Grafana는 익명 읽기 전용(Viewer), 편집은 관리자만 (사람 결정) | 면접관이 계정 없이 대시보드를 본다. 관리자 비밀번호를 나눠 줄 필요가 없다. 대신 대시보드 쿼리로 클러스터 지표(Pod 이름 등)를 누구나 볼 수 있다 |
+| 관리자 비밀번호는 ESO Password 생성기로 클러스터 안에서 한 번만(`CreatedOnce`) | 차트 기본값(`prom-operator`)을 쓰지 않는다. Secrets Manager의 `fe`·`be` 구조를 늘리지 않는다. 읽기: `kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' \| base64 -d` |
+| 대시보드는 코드(ConfigMap)로, Grafana 저장소는 두지 않음 | 화면에서 바꾼 내용은 재시작하면 사라진다. 대시보드 변경도 커밋으로 한다 |
+| Alertmanager 끔 | 알림을 받을 곳(메일·슬랙)이 없다 |
+| k3s 내장 컴포넌트(컨트롤러 매니저·스케줄러·kube-proxy·etcd) 수집 끔 | k3s는 이들을 한 프로세스에 넣어 따로 수집할 수 없다. 켜 두면 수집 실패 경보만 쌓인다 |
+| Prometheus 7일·3GB | 데이터 EBS(10GiB)를 MariaDB와 나눠 쓴다 |
+
+**Restella 대시보드 패널:** 확정·거절·오버부킹 충돌(24시간), 채널 동기화 지연 p50/p95(목표 5초), 채널별 동기화 실패(재시도·최종), 경로별 API 응답 시간 p95(목표 300ms).
+
 ## gitops: front-end (`gitops/charts/front-end`)
 
 | 파일 | 내용 |
@@ -394,6 +414,7 @@ terraform -chdir=infra/terraform/envs/demo output -raw github_actions_role_arn |
 | ESO | 노드 역할로 동작: ClusterSecretStore `aws-secrets-manager` Valid, ECR pull Secret `ecr-pull` 동기화 |
 | HTTPS | Let's Encrypt 실제 발급자로 `fe.`·`api.` 인증서 발급. HTTP는 301로 HTTPS 이동 |
 | CI | 두 앱 워크플로가 ECR 푸시와 gitops 다이제스트 커밋까지 성공. 공개 로그에 계정 ID 노출 없음 |
+| 모니터링 | `grafana.` 도메인에 Let's Encrypt 인증서 발급. 로그인 없이 Restella 대시보드 조회, 익명 편집 시도는 403. Prometheus가 back-end `/metrics` 수집(`up=1`), 예약 결과 지표 확인 |
 
 **배포 중 생긴 문제**
 1. **보안 그룹 규칙 설명:** 한글 설명을 AWS가 거부했다. 영문으로 바꾸고 `k3s-node` 모듈 변수에 형식 검사를 넣었다.
@@ -401,7 +422,7 @@ terraform -chdir=infra/terraform/envs/demo output -raw github_actions_role_arn |
 3. **Argo CD 순환 대기:** `argocd-bootstrap`과 루트가 서로를 기다려 멈췄다([ADR-0005 결정 1](../docs/adr/0005-cluster-bootstrap.md#결정-1-argo-cd는-k3s-내장-helmchart로-설치하고-그-뒤로는-argo-cd가-스스로-관리한다)). Git을 고친 뒤, 노드에서 새 `argocd-bootstrap` 정의를 직접 적용하고 `root-demo`의 `argocd.argoproj.io/tracking-id` annotation을 지워 풀었다.
 4. **cluster-config 첫 동기화:** ESO webhook이 준비되기 전이라 실패했고, 재시도로 저절로 회복했다.
 
-**아직 하지 않은 것:** 모니터링(Prometheus·Grafana), prod 코드, 실제 노드의 메타데이터 차단 확인, 스팟 회수 복구 시험, p95 부하 테스트.
+**아직 하지 않은 것:** prod 코드, 실제 노드의 메타데이터 차단 확인, 스팟 회수 복구 시험, p95 부하 테스트.
 
 ## 운영 원칙
 
@@ -411,4 +432,4 @@ terraform -chdir=infra/terraform/envs/demo output -raw github_actions_role_arn |
 
 ## 참고
 
-(모니터링을 구성할 때 참고) Grafana Helm 차트는 `grafana-community` 저장소로 옮겨졌다. kube-prometheus-stack 92.2.0도 `oci://ghcr.io/grafana-community/helm-charts`를 참조한다.
+Grafana Helm 차트는 `grafana-community` 저장소로 옮겨졌다. kube-prometheus-stack 92.3.0도 `oci://ghcr.io/grafana-community/helm-charts`를 참조한다.

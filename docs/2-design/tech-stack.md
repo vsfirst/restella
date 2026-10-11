@@ -48,9 +48,9 @@
 | 비밀값 전달 | External Secrets Operator | 2.12.0 (차트 2.12.0) | 최신 |
 | TLS | demo: cert-manager + Let's Encrypt | v1.21.2 | 최신 (Kubernetes 1.33~1.36 지원) |
 | | prod: ALB + ACM | AWS 관리형 | 설계만. 코드는 아직 작성하지 않았다 |
-| 관측 | kube-prometheus-stack | 92.2.0 | **미구현.** 버전만 정했고 배포하지 않았다 |
-| | Prometheus | 3.13.4 | **미구현.** LTS (2027-07 지원 종료) |
-| | Grafana | 13.2.3 (grafana 차트 13.4.0) | **미구현.** 최신 (차트 기본값) |
+| 관측 | kube-prometheus-stack | 92.3.0 | 최신 |
+| | Prometheus | 3.13.4 | LTS (2027-07 지원 종료). 차트 기본값(3.15) 대신 이미지 태그를 고정했다 |
+| | Grafana | grafana 차트 13.5.0 (kube-prometheus-stack 포함) | 최신 (차트 기본값) |
 | 보안 | gitleaks (커밋 전 비밀값 검사) | 8.30.1 | 최신 |
 | CI / 이미지 저장소 | GitHub Actions / Amazon ECR | — | 사람 결정 ([ADR-0003](../adr/0003-delivery-pipeline.md)) |
 | | GitHub Actions 러너 | ubuntu-24.04, ubuntu-24.04-arm | 이미지는 arm64 러너에서 네이티브 빌드 |
@@ -72,7 +72,7 @@
 | k3s | v1.37.1 | v1.36.5 | 호환 우선. Argo CD 3.5가 테스트한 Kubernetes는 v1.33~v1.36이고, k3s stable 채널도 v1.36.5다 |
 | Helm CLI | 4.3.0 | 4.2.1 | 호환 우선. Argo CD 3.5.4에 내장된 Helm이 4.2.1이라, 로컬 `helm template` 결과를 Argo CD 렌더링 결과와 맞춘다 |
 | openapi-typescript | 7.13.0 | 쓰지 않음 (@hey-api/openapi-ts 0.99.0) | 호환 우선. peerDependencies가 `typescript ^5.x`라 TypeScript 6과 맞지 않는다 |
-| Prometheus | 3.15.0 (차트 기본값 3.14.0) | 3.13.4 | LTS 우선. prometheus-operator 0.94.1의 호환 목록에 3.13 라인이 들어 있다. (관측 스택은 아직 배포하지 않았다) |
+| Prometheus | 3.15.0 (차트 기본값 3.14.0) | 3.13.4 | LTS 우선. prometheus-operator 0.94.1의 호환 목록에 3.13 라인이 들어 있다. `values/demo/monitoring.yaml`에서 이미지 태그를 고정한다 |
 
 ## 재검토 일정
 
