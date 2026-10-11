@@ -9,7 +9,8 @@ module "ecr" {
   force_delete = true # demo를 정리할 때 이미지가 남아 있어도 지울 수 있게 한다
 }
 
-# GitHub Actions용 역할: OIDC로만 맡을 수 있고, 지정한 저장소의 main 브랜치에서만 허용한다
+# GitHub Actions용 역할: OIDC로만 맡을 수 있고, 지정한 저장소의 main 브랜치에서만 허용한다.
+# 저장소는 이름이 아니라 소유자·저장소 ID까지 든 "변경 불가 subject"로 고른다. 이름을 바꾸거나 같은 이름으로 다시 만든 저장소가 역할을 맡지 못한다
 # OIDC 공급자는 global 스택이 만든다 (global을 먼저 적용)
 
 data "aws_iam_openid_connect_provider" "github_actions" {
@@ -34,7 +35,7 @@ data "aws_iam_policy_document" "github_actions_assume" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:ref:refs/heads/main"]
+      values   = ["${var.github_oidc_subject_prefix}:ref:refs/heads/main"]
     }
   }
 }

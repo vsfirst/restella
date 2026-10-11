@@ -82,6 +82,14 @@ variable "ingress_rules" {
     ])
     error_message = "각 규칙은 cidr_ipv4와 source_security_group_id 중 정확히 하나만 지정해야 한다."
   }
+
+  # AWS는 규칙 설명에 영문, 숫자, 공백과 ._-:/()#,@[]+=&;{}!$* 만 받는다. plan에서는 걸리지 않고 apply에서 실패하므로 미리 막는다
+  validation {
+    condition = alltrue([
+      for rule in var.ingress_rules : can(regex("^[a-zA-Z0-9. _\\-:/()#,@\\[\\]+=&;{}!$*]{0,255}$", rule.description))
+    ])
+    error_message = "규칙 설명(description)은 영문, 숫자, 공백과 ._-:/()#,@[]+=&;{}!$* 만 쓸 수 있고 255자 이하여야 한다."
+  }
 }
 
 variable "imds_hop_limit" {

@@ -34,7 +34,8 @@ module "k3s_node" {
   # 들어오는 트래픽은 웹(80, 443)만 허용한다. SSH(22)와 Kubernetes API(6443)는 열지 않는다
   ingress_rules = [
     {
-      description = "HTTP: Let's Encrypt HTTP-01 인증, HTTPS로 리다이렉트"
+      # Let's Encrypt HTTP-01 인증, 나머지는 Traefik이 HTTPS로 리디렉션한다. AWS 규칙 설명은 영문·일부 기호만 받는다
+      description = "HTTP for ACME HTTP-01 and redirect to HTTPS"
       from_port   = 80
       to_port     = 80
       cidr_ipv4   = "0.0.0.0/0"

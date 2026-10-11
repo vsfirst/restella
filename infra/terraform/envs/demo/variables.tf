@@ -15,13 +15,17 @@ variable "hosted_zone_name" {
   type        = string
 }
 
-variable "github_repository" {
-  description = "이미지를 푸시할 GitHub 저장소 (owner/name). 이 저장소의 main 브랜치만 ECR 푸시 역할을 맡을 수 있다"
+variable "github_oidc_subject_prefix" {
+  description = <<-EOT
+    GitHub Actions OIDC 토큰 sub의 저장소 부분. 이 저장소의 main 브랜치만 ECR 푸시 역할을 맡을 수 있다.
+    저장소가 "변경 불가 subject"를 쓰면 소유자·저장소 ID가 붙는다: repo:<owner>@<owner_id>/<name>@<repo_id>.
+    값은 gh api repos/<owner>/<name>/actions/oidc/customization/sub 의 sub_claim_prefix 그대로다
+  EOT
   type        = string
 
   validation {
-    condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_repository))
-    error_message = "github_repository는 owner/name 형식이어야 한다."
+    condition     = can(regex("^repo:[A-Za-z0-9_.-]+(@[0-9]+)?/[A-Za-z0-9_.-]+(@[0-9]+)?$", var.github_oidc_subject_prefix))
+    error_message = "github_oidc_subject_prefix는 repo:<owner>/<name> 또는 repo:<owner>@<id>/<name>@<id> 형식이어야 한다."
   }
 }
 
