@@ -1,6 +1,6 @@
 # Argo CD 설치. k3s의 내장 Helm 컨트롤러(helm.cattle.io)가 이 리소스를 보고 argo-cd 차트를 설치·업그레이드한다.
 # - 최초 1회: infra/scripts/bootstrap-demo-argocd.sh가 노드에서 이 파일과 root.yaml을 적용한다
-# - 이후: Argo CD의 argocd-bootstrap Application(apps/demo/argocd-bootstrap.yaml)이 이 파일을 Git과 맞춘다.
+# - 이후: Argo CD의 argocd-bootstrap Application(apps/demo/argocd-bootstrap.yaml)이 이 파일만 Git과 맞춘다.
 #   그래서 Argo CD 설정 변경도 Git 커밋으로만 한다
 # 결정: docs/adr/0005-cluster-bootstrap.md
 apiVersion: helm.cattle.io/v1

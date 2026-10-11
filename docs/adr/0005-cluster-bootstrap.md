@@ -19,7 +19,8 @@
 | **k3s HelmChart 리소스 + 최초 1회 SSM 적용 + 이후 자기 관리** | **채택.** k3s에 이미 있는 Helm 컨트롤러가 설치·업그레이드를 맡아 노드에 도구를 더 설치하지 않는다. 설치 정의(`bootstrap/demo/argocd.yaml`)가 Git에 있고, 등록 후에는 `argocd-bootstrap` Application이 이 파일을 Git과 맞추므로 Argo CD 설정 변경도 커밋으로 한다 |
 
 - 최초 적용은 [`bootstrap-demo-argocd.sh`](../../infra/scripts/bootstrap-demo-argocd.sh)가 한다. SSM Run Command로 노드에서 공개 저장소의 파일을 받아 적용한다.
-- `argocd-bootstrap`은 지우기(prune)를 끈다. 파일을 실수로 지워도 Argo CD 자신과 루트 Application이 사라지지 않는다.
+- `argocd-bootstrap`은 지우기(prune)를 끈다. 파일을 실수로 지워도 Argo CD 자신이 사라지지 않는다.
+- **루트 Application은 Argo CD가 관리하지 않는다.** 처음에는 `argocd-bootstrap`이 루트(`root.yaml`)도 관리했다. 그러자 demo 첫 배포에서 sync wave가 멈췄다. 루트는 wave -2인 `argocd-bootstrap`이 Healthy가 되기를 기다리고, `argocd-bootstrap`은 자기가 관리하는 루트가 Healthy가 되기를 기다렸기 때문이다. 로컬 테스트에서는 GitHub의 `apps/demo`가 비어 있어 루트가 바로 Healthy가 돼 드러나지 않았다. 이제 `argocd-bootstrap`은 `argocd.yaml`만 관리하고, 루트는 부트스트랩 스크립트만 적용한다.
 - 설정이 잘못돼 Argo CD가 망가지면 스스로 고칠 수 없다. 이때는 스크립트를 다시 실행해 Git의 정의로 되돌린다.
 
 ## 결정 2: App of Apps와 sync wave로 순서를 정한다
@@ -28,7 +29,7 @@
 
 | wave | Application | 내용 |
 |---|---|---|
-| -2 | `argocd-bootstrap` | Argo CD 자신의 설치 정의, 루트 Application |
+| -2 | `argocd-bootstrap` | Argo CD 자신의 설치 정의 (루트 Application은 제외) |
 | -1 | `external-secrets` | ESO 2.12.0 (CRD 포함) |
 | -1 | `cert-manager` | cert-manager v1.21.2 (CRD 포함) |
 | 0 | `cluster-config` | 네임스페이스, ClusterSecretStore, ECR pull Secret, 인스턴스 메타데이터 차단, Let's Encrypt 발급자, Traefik HTTPS 리디렉션 |

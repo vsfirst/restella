@@ -103,7 +103,7 @@ terraform -chdir=global apply
 terraform -chdir=global output name_servers                  # 상위 도메인의 NS 위임과 같은지 확인
 
 # 3) demo
-cp envs/demo/terraform.tfvars.example envs/demo/terraform.tfvars   # hosted_zone_name, github_repository
+cp envs/demo/terraform.tfvars.example envs/demo/terraform.tfvars   # hosted_zone_name, github_oidc_subject_prefix
 terraform -chdir=envs/demo init -backend-config=backend.hcl
 terraform -chdir=envs/demo apply
 
@@ -131,7 +131,7 @@ aws ec2 describe-spot-instance-requests --filters Name=state,Values=open,active
 | 리소스 | 내용 |
 |---|---|
 | ECR | `restella-demo/front-end`, `restella-demo/back-end`. 태그 덮어쓰기 금지, 푸시할 때 스캔, 최근 30개 보관 |
-| GitHub Actions 역할 | OIDC로만 맡을 수 있다. `github_repository`의 `main` 브랜치만 허용하고 ECR 푸시 권한만 있다 |
+| GitHub Actions 역할 | OIDC로만 맡을 수 있다. `github_oidc_subject_prefix`(소유자·저장소 ID가 든 변경 불가 subject)의 `main` 브랜치만 허용하고 ECR 푸시 권한만 있다 |
 | Secrets Manager | `restella-demo`. 값은 Terraform 밖에서 넣는다 |
 | 노드 역할 추가 권한 | ECR 토큰 발급과 pull, `restella-demo` 비밀값 읽기. External Secrets Operator가 이 권한을 쓴다 |
 
@@ -201,7 +201,7 @@ front-end는 `APP_ENV`가 demo·prod이면 back-end를 아래 주소로 부른�
 |---|---|
 | [`bootstrap/demo/argocd.yaml`](gitops/bootstrap/demo/argocd.yaml) | Argo CD 설치 정의(k3s HelmChart, argo-cd 10.10.2). Application 상태 판단 설정, SSO·알림 끔, 노드 한 대용 자원 |
 | [`bootstrap/demo/root.yaml`](gitops/bootstrap/demo/root.yaml) | 루트 Application `root-demo`. `apps/demo`를 동기화한다 |
-| [`apps/demo/argocd-bootstrap.yaml`](gitops/apps/demo/argocd-bootstrap.yaml) | wave -2. Argo CD가 위 두 파일을 Git과 맞춘다(지우기는 끔) |
+| [`apps/demo/argocd-bootstrap.yaml`](gitops/apps/demo/argocd-bootstrap.yaml) | wave -2. Argo CD가 자기 설치 정의(`argocd.yaml`)만 Git과 맞춘다(지우기는 끔). 루트 Application까지 맡기면 서로의 상태를 기다려 멈춘다(ADR-0005) |
 | [`apps/demo/external-secrets.yaml`](gitops/apps/demo/external-secrets.yaml) | wave -1. ESO 2.12.0 공식 차트 + [`values/demo/external-secrets.yaml`](gitops/values/demo/external-secrets.yaml) |
 | [`apps/demo/cert-manager.yaml`](gitops/apps/demo/cert-manager.yaml) | wave -1. cert-manager v1.21.2 공식 차트 + [`values/demo/cert-manager.yaml`](gitops/values/demo/cert-manager.yaml) |
 | [`apps/demo/cluster-config.yaml`](gitops/apps/demo/cluster-config.yaml) | wave 0. [`charts/cluster-config`](gitops/charts/cluster-config): 네임스페이스 `restella`, ClusterSecretStore `aws-secrets-manager`, ECR pull Secret `ecr-pull`(6시간마다 갱신), 인스턴스 메타데이터 차단, Let's Encrypt 발급자(`letsencrypt`, `letsencrypt-staging`), Traefik HTTPS 리디렉션 |
