@@ -6,8 +6,8 @@
 
 | 분류 | 예 | 대신 둘 곳 |
 |---|---|---|
-| 비밀값 | DB 비밀번호, iron-session 키, JWT 서명 키, 채널 API 키·HMAC 키, AWS 자격 증명, kubeconfig, SSH 키, 인증서 개인키 | 운영: AWS Secrets Manager의 `restella-demo` 비밀값([ADR-0003](../adr/0003-delivery-pipeline.md)) / 로컬: `.env` (gitignore) |
-| 인프라 식별 정보 | AWS 계정 ID(ECR 레지스트리 주소, IAM ARN 포함), 실제 IP, 도메인, Terraform state 버킷 이름, `*.tfvars` | `*.tfvars`·`backend.hcl`은 gitignore하고 `*.example`만 커밋. state는 S3에만 둔다. 클러스터에 필요한 레지스트리 주소와 도메인은 부트스트랩이 클러스터 Secret annotation으로 넣는다([ADR-0005 결정 4](../adr/0005-cluster-bootstrap.md)). Terraform 출력은 `sensitive`, CI 로그는 계정 ID를 가린다 |
+| 비밀값 | DB 비밀번호, iron-session 키, JWT 서명 키, 채널 서명 키(HMAC), AWS 자격 증명, kubeconfig, SSH 키, 인증서 개인키 | 운영: AWS Secrets Manager의 `restella-demo` 비밀값([ADR-0003](../adr/0003-delivery-pipeline.md)) / 로컬: `.env` (gitignore) |
+| 인프라 식별 정보 | AWS 계정 ID(ECR 레지스트리 주소, IAM ARN 포함), 실제 IP, 도메인, Terraform state 버킷 이름, `*.tfvars` | `*.tfvars`·`backend.hcl`은 gitignore하고 `*.example`만 커밋. state는 S3에만 둔다. 클러스터에 필요한 레지스트리 주소와 도메인은 부트스트랩이 클러스터 Secret annotation으로 넣는다([ADR-0005 결정 4](../adr/0005-cluster-bootstrap.md)). 계정 ID·도메인이 들어간 Terraform 출력은 `sensitive`로 두고, CI 로그는 계정 ID를 가린다 |
 | 개인정보 | 실명, 전화번호, 이메일, 주소, 실제 예약자 정보 | 시드·테스트 데이터는 누가 봐도 가짜인 값만 쓴다 (예: `테스트 손님 1`, `guest1@example.com`, `010-0000-0000`) |
 | 작업 환경 정보 | 개인 이메일, 로컬 경로, AI 세션 대화 원문 | 커밋 작성자 이메일은 GitHub noreply 주소를 쓴다. 세션 기록은 정리한 요약만 커밋한다 |
 

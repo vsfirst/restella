@@ -21,6 +21,7 @@
 - 최초 적용은 [`bootstrap-demo-argocd.sh`](../../infra/scripts/bootstrap-demo-argocd.sh)가 한다. SSM Run Command로 노드에서 공개 저장소의 파일을 받아 적용한다.
 - `argocd-bootstrap`은 지우기(prune)를 끈다. 파일을 실수로 지워도 Argo CD 자신이 사라지지 않는다.
 - **루트 Application은 Argo CD가 관리하지 않는다.** 처음에는 `argocd-bootstrap`이 루트(`root.yaml`)도 관리했다. 그러자 demo 첫 배포에서 sync wave가 멈췄다. 루트는 wave -2인 `argocd-bootstrap`이 Healthy가 되기를 기다리고, `argocd-bootstrap`은 자기가 관리하는 루트가 Healthy가 되기를 기다렸기 때문이다. 로컬 테스트에서는 GitHub의 `apps/demo`가 비어 있어 루트가 바로 Healthy가 돼 드러나지 않았다. 이제 `argocd-bootstrap`은 `argocd.yaml`만 관리하고, 루트는 부트스트랩 스크립트만 적용한다.
+- **멈춘 클러스터는 Git 수정만으로 풀리지 않았다.** 새 `argocd-bootstrap` 정의를 클러스터에 반영하는 일은 루트의 동기화가 맡는데, 그 동기화가 바로 `argocd-bootstrap`을 기다리며 멈춰 있었기 때문이다. SSM으로 노드에서 새 정의를 직접 적용하고, `root-demo`에 남은 `argocd.argoproj.io/tracking-id` annotation(`argocd-bootstrap`이 관리하던 표시)을 지웠다. 옛 정의로 진행 중이던 동기화가 annotation을 다시 붙여 한 번 더 지웠다. 새로 설치하는 클러스터는 처음부터 고친 정의를 받으므로 이 절차가 필요 없다.
 - 설정이 잘못돼 Argo CD가 망가지면 스스로 고칠 수 없다. 이때는 스크립트를 다시 실행해 Git의 정의로 되돌린다.
 
 ## 결정 2: App of Apps와 sync wave로 순서를 정한다
@@ -38,7 +39,7 @@
 | 3 | front-end (ApplicationSet) | 운영자 콘솔 |
 
 - Argo CD 1.8부터 Application의 상태 판단이 기본에서 빠져서, 그대로는 wave를 기다리지 않는다. 공식 문서의 상태 판단 설정을 `argocd-cm`에 넣었다.
-- 앞 단계가 Ready가 돼도 바로는 받지 못하는 경우가 있다. 예를 들어 cert-manager webhook은 CA가 주입되기 전 몇 초 동안 요청을 거부한다(테스트에서 재현). 자동 동기화는 기본값으로 실패를 다시 시도하지 않으므로, 모든 Application에 재시도(5회, 10초부터 두 배씩 최대 3분)를 둔다.
+- 앞 단계가 Ready가 돼도 바로는 받지 못하는 경우가 있다. 예를 들어 cert-manager webhook은 CA가 주입되기 전 몇 초 동안 요청을 거부한다(테스트에서 재현). 자동 동기화는 기본값으로 실패를 다시 시도하지 않으므로, 모든 Application에 재시도(5회, 10초부터 두 배씩 최대 3분)를 둔다. demo 첫 배포에서는 `cluster-config`가 ESO webhook의 엔드포인트가 생기기 전에 동기화돼 실패했고, 이 재시도로 사람 개입 없이 회복했다.
 
 ## 결정 3: 인스턴스 메타데이터는 네임스페이스마다 NetworkPolicy로 막는다
 
@@ -66,7 +67,7 @@
 
 대상과 같은 k3s v1.36.5를 Docker 컨테이너로 띄워 확인했다.
 
-- **부트스트랩:** 메타데이터 차단 정책을 먼저 건 상태에서 스크립트가 노드에서 실행할 명령을 그대로 돌렸다. Argo CD 컴포넌트 5개가 32초 만에 떴고, 루트 Application이 GitHub에서 동기화됐다. `argocd-cm`에 상태 판단 설정이 들어갔다.
+- **부트스트랩:** 메타데이터 차단 정책을 먼저 건 상태에서 스크립트가 노드에서 실행할 명령을 그대로 돌렸다. Argo CD 컴포넌트 5개가 32초 만에 떴고, 루트 Application이 GitHub에서 동기화됐다(이때 GitHub의 `apps/demo`가 비어 있어 하위 앱 없이 바로 Healthy가 됐다. 그래서 결정 1의 순환 대기가 드러나지 않았다). `argocd-cm`에 상태 판단 설정이 들어갔다.
 - **Application 정의:** 5개 모두 서버 검증을 통과했다.
 - **ESO:** 2.12.0이 정상 기동했다. AWS 자격 증명이 없는 로컬에서 ClusterSecretStore와 ECR 토큰 생성기는 "EC2 인스턴스 메타데이터에서 역할을 찾지 못함"으로 실패했다. 설정은 맞고 노드 역할을 찾으러 간다는 뜻이다.
 - **ECR pull Secret 템플릿:** ESO의 Fake 생성기로 확인했다. `kubernetes.io/dockerconfigjson` 타입이 되고, 레지스트리 주소와 인증값이 올바르게 만들어졌다.
@@ -75,4 +76,11 @@
   - HelmChart 이름이 리소스 이름 앞에 붙어(`argo-cd-argocd-server`) `fullnameOverride: argocd`를 넣었다.
   - 테스트 이미지에서 `k3s kubectl`이 동작하지 않아, 스크립트는 k3s 설치 스크립트가 만드는 `kubectl` 링크를 쓰도록 바꿨다.
 - **결정 4:** 가짜 레지스트리·도메인으로 부트스트랩을 다시 돌려 클러스터 Secret을 만들었다. back-end ApplicationSet이 그 값을 파라미터로 넣은 Application을 만들었고, 클러스터 Secret을 만든 뒤에도 Argo CD와 클러스터의 통신은 정상이었다.
-- **실제 노드에서 남은 확인:** 노드 역할로 Secrets Manager와 ECR 토큰을 받는지, 실제 169.254.169.254가 막히는지.
+## demo 노드 결과 (2026-10-11)
+
+- 모든 Application이 Synced/Healthy가 됐다.
+- **ESO와 노드 역할:** ClusterSecretStore `aws-secrets-manager`가 Valid, ECR pull Secret `ecr-pull`이 동기화됐다. IMDS 홉 2로 ESO Pod가 노드 역할을 받는다.
+- **HTTPS:** Let's Encrypt 실제 인증서가 발급됐다.
+- **배포 중 문제:** 결정 1의 순환 대기(복구 절차 포함), 결정 2의 webhook 시간차(재시도로 자동 회복).
+- **남은 확인:** 실제 169.254.169.254가 지정한 네임스페이스에서 막히는지.
+- Argo CD 화면은 Ingress로 공개하지 않고 SSM 포트 포워딩으로 접속한다.

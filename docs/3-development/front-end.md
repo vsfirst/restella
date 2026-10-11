@@ -28,7 +28,7 @@
 | iron-session 설정 위치 | `_app` | `shared/api` (서버 전용 `index.server.ts`) | 화면(`_pages`)이 서버 렌더링에서 토큰을 써야 한다. FSD에서는 아래 레이어가 `_app`을 import할 수 없다 |
 | SSE 중계 경로 | 별도 Route Handler | `/api/bff/[...path]` 하나로 일반 요청과 SSE를 함께 중계 | 응답 본문을 그대로 흘려보내면 SSE도 동작한다. 경로(`/api/bff/events/stream`)는 설계와 같다 |
 | 결정 대기 3건 | zod, shadcn/ui·TanStack Table, openapi-typescript | 쓰지 않음, 쓰지 않음, `@hey-api/openapi-ts` | [front-end 설계 "정한 것"](../../front-end/README.md#정한-것) |
-| S-07 "평균 동기화 지연" | 최근 1시간 평균 | "동기화 완료 n/m", "전송 대기·재시도 n건" | 평균 지연을 주는 API가 없다. 지연은 Prometheus 지표(NFR-05)로 본다 |
+| S-07 "평균 동기화 지연" | 최근 1시간 평균 | "동기화 완료 n/m", "전송 대기·재시도 n건" | 평균 지연을 주는 API가 없다. 지연은 back-end `/metrics` 지표(NFR-05)로 본다. 이를 수집할 Prometheus·Grafana는 아직 구성하지 않았다 |
 | S-04 처리됨 탭 | "처리됨" 하나 | 미처리·옮김·해결됨·취소 탭 | back-end가 상태 하나씩 조회한다. 처리 방식별로 나눠 보는 편이 사후 확인에 낫다 |
 | FSD `features` 레이어 | 사용자 행동 6개 | 두지 않음. 각 행동은 쓰는 위젯 안에(로그인 폼은 로그인 화면에) | 모든 기능이 한 곳에서만 쓰였다. 레이어를 오가며 고칠 이유가 없다(사람 결정) |
 | FSD `entities` 레이어 | 엔티티 7개 (요청 함수, 타입, 배지) | 두지 않음. 경로·요청·타입·도메인 표시 부품은 `shared` | 경로를 한 파일로 모으고 props로 그리게 바꾸자 엔티티 대부분이 한 줄짜리 포장만 남았다(사람 결정). 파일 38개 → 7개 |
@@ -48,5 +48,5 @@
 ## 남은 일
 
 - 로그인 시도 제한이 IP 기준이라 BFF 뒤에서는 모든 운영자가 한도를 함께 쓴다([front-end 설계 "알려진 제약"](../../front-end/README.md#인증-흐름)).
-- Dockerfile(arm64)과 CI는 infra 단계에서 작성한다.
+- (완료) Dockerfile(arm64)과 CI(`.github/workflows/demo-front-end.yaml`)를 작성하고 demo에 배포했다. 콘솔 주소는 `fe.<도메인>`이다([demo 사용 안내](../../DEMO.md)).
 - 코드 리뷰(`/code-review`)를 하고 [코드 리뷰 기록](code-review.md)을 남긴다.

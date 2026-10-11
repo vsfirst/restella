@@ -13,8 +13,8 @@
 | 단위 | Vitest 5 | 순수 로직: 숙박일 계산, 서명, 재시도 간격, 잠금 재시도 | `back-end/src/**/*.spec.ts` |
 | 통합·E2E (back-end) | Vitest 5 + Testcontainers(MariaDB 12.3.3) + HTTP | 요구사항의 완료 조건 전체(API 수준) | `back-end/test/*.e2e-spec.ts` |
 | 빌드 결과물 확인 | 빌드 → 마이그레이션 → 시드 → 기동 → HTTP 호출 | 컴파일된 ESM이 실제로 뜨는지 | 로컬 Docker Compose |
-| E2E (화면) | Playwright | "마지막 1실" 시연 시나리오 | front-end 단계에서 작성 |
-| 인프라 | terraform validate, tflint, 실제 배포 | demo 환경 | infra 단계에서 작성 |
+| E2E (화면) | Playwright | "마지막 1실" 시연 시나리오 | `front-end/e2e/last-room.spec.ts` |
+| 인프라 | terraform fmt·validate·plan, 로컬 k3s v1.36.5(Docker)에 차트 배포 후 Playwright E2E, demo 실제 배포 | 차트·클러스터 구성, demo 환경 | `infra/` ([infra 설계](../../infra/README.md)) |
 
 ## 동시성 테스트 설계
 

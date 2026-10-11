@@ -1,6 +1,6 @@
 # 테스트 결과 보고서
 
-## back-end (2026-10-09)
+## back-end (첫 실행 2026-10-09. 최신 수치는 아래 "전체 재실행 (2026-10-11)")
 
 **환경:** Node.js 24.21.0, pnpm 12.10.1, Vitest 5.0.3, Testcontainers 12.2.0, MariaDB 12.3.3 (Docker, arm64)
 
@@ -85,6 +85,13 @@
 | 5 | REQ-20 테스트 간헐 실패 | 가짜 채널이 값을 받은 직후, 발송기가 "보냄"을 기록하기 전에 조회함 (테스트의 경쟁 조건) | API가 동기화 완료 상태가 될 때까지 기다리도록 테스트를 고침 |
 | 6 | 빌드 결과물의 Swagger 문서에 요청 형식이 비어 있음 | Swagger 플러그인은 기본적으로 `*.dto.ts`만 분석하는데 DTO가 컨트롤러 파일에 있음 | 플러그인 분석 대상에 컨트롤러 파일 추가. 이후 DTO를 `dto/*.dto.ts`로 분리하면서 기본 설정으로 되돌림(2026-10-10) |
 
+## infra (2026-10-11)
+
+- **로컬 k3s:** demo와 같은 k3s v1.36.5를 Docker에 띄워 차트를 배포하고, 배포된 front-end 차트를 대상으로 Playwright E2E 2개가 통과했다. 세부 내용은 [infra 설계](../../infra/README.md)의 차트별 "검증"에 있다.
+- **demo 배포:** t4g.large 스팟 노드 1대(k3s v1.36.5, Argo CD 3.5.4, ESO 2.12.0, cert-manager v1.21.2, Traefik 3.7.13). Application 8개 모두 Synced/Healthy, mariadb·back-end·front-end Pod 실행, 마이그레이션·시드 Job 완료.
+- **HTTPS:** `fe.`·`api.` 도메인에 Let's Encrypt 인증서가 발급됐고, HTTP 요청은 301로 HTTPS에 넘어간다(AC-N03-2).
+- **CI:** `demo-back-end`·`demo-front-end` 워크플로가 테스트 → arm64 빌드 → ECR 푸시 → 이미지 다이제스트 커밋까지 성공했다(AC-N06-1). 공개된 Actions 로그에 AWS 계정 ID가 그대로 찍힌 줄은 없다.
+
 ## 남은 검증
 
-- 인프라: demo 환경에서 HTTPS(AC-N03-2), 응답 시간 p95(AC-N02-1), 스팟 회수 후 복구(AC-N07-1), Grafana 대시보드(AC-N05-1)를 확인한다(infra 단계).
+- 인프라: demo 환경에서 응답 시간 p95(AC-N02-1), 이전 커밋으로 되돌리기(AC-N06-2), 스팟 회수 후 복구(AC-N07-1), 일일 스냅샷 생성(AC-N07-2), 실제 노드에서 인스턴스 메타데이터 차단, Grafana 대시보드(AC-N05-1, 모니터링 구성 후)를 확인한다.

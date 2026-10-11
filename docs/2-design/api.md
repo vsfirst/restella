@@ -8,9 +8,9 @@
 |---|---|---|---|---|
 | 채널 API | `/api/v1/channel/*` | 채널(데모에서는 시뮬레이터) | 채널별 HMAC 서명 | `api.<도메인>`으로 공개 |
 | 운영자 API | `/api/v1/*` (채널 API 제외) | front-end BFF만 | 운영자 토큰(JWT) | **비공개.** 클러스터 안에서만 접근한다 |
-| API 문서 | `/api/docs` | 심사자 | 없음 | `api.<도메인>`으로 공개 |
-| 상태 확인·지표 | `/health/*`, `/metrics` | Kubernetes, Prometheus | 없음 | **비공개** |
-| 시뮬레이터 수신 | `/internal/simulator/*` | Restella 동기화 발송기 | Restella HMAC 서명 | **비공개** |
+| API 문서 | `/api/docs`, `/api/docs-json` | 심사자 | 없음 | `api.<도메인>`으로 공개 |
+| 상태 확인·지표 | `/health/*`, `/metrics` | Kubernetes 프로브 (지표 수집기는 아직 배포하지 않음) | 없음 | **비공개** |
+| 시뮬레이터 수신 | `/internal/simulator/*` | Restella 동기화 발송기 | Restella HMAC 서명 (POST만. 상태 조회 `GET`은 서명 없음, 테스트·디버깅용) | **비공개** |
 
 운영자 API는 Ingress에 노출하지 않는다. 그래도 JWT 검사는 그대로 한다. 네트워크 경계와 인증을 겹쳐 두는 것이다.
 
@@ -32,7 +32,7 @@
 | 본문 없음 | 204 |
 | 실패 | [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json` |
 
-**모든 응답에 `X-Request-Id` 헤더가 붙는다.** 앞단(BFF)이 형식에 맞는 값(영문·숫자·`._-` 8~64자)을 보내면 이어 쓰고, 아니면 back-end가 새로 만든다. 오류 본문의 `requestId`와 같은 값이라, 오류가 나면 이 값으로 로그(Loki)를 찾는다.
+**모든 응답에 `X-Request-Id` 헤더가 붙는다.** 앞단(BFF)이 형식에 맞는 값(영문·숫자·`._-` 8~64자)을 보내면 이어 쓰고, 아니면 back-end가 새로 만든다. 오류 본문의 `requestId`와 같은 값이라, 오류가 나면 이 값으로 back-end 로그(`kubectl logs`)를 찾는다.
 
 ```json
 {
@@ -167,8 +167,8 @@ Restella가 채널에 보내는 요청의 계약이다. 실제 OTA 대신 back-e
 | `POST /api/v1/conflicts/{id}/cancel` | 충돌을 취소로 처리하고 채널에 전달 | REQ-14 |
 | `POST /api/v1/conflicts/{id}/resolve` | `{ note }`(필수)로 해결됨 처리 | REQ-14 |
 | `POST /api/v1/conflicts/{id}/move` | `{ roomTypeId }`로 다른 객실타입으로 옮긴다 | REQ-15 (Could) |
-| `GET /api/v1/events?type=&from=` | 이벤트 로그 | REQ-17 |
-| `GET /api/v1/events/stream` | SSE. 바뀐 대상만 알린다: `conflict.created`, `reservation.changed`, `inventory.changed`, `sync.changed` | REQ-13 |
+| `GET /api/v1/events?type=&cursor=&limit=` | 이벤트 로그 (최신순, 유형은 쉼표로 여러 개) | REQ-17 |
+| `GET /api/v1/events/stream` | SSE. 바뀐 대상만 알린다: `conflict.created`, `reservation.changed`, `inventory.changed`, `sync.changed`, 15초마다 `heartbeat` | REQ-13 |
 | `GET /api/v1/channels` | 채널 목록과 유형(확인형, 통보형) | REQ-20 |
 | `GET /api/v1/channels/availability?roomTypeId=&from=&to=` | 채널별로 마지막에 보낸 남은 재고와 시각 | REQ-20 |
 | `POST /api/v1/simulations` | 동시 예약 시뮬레이션 실행. 아래 참고 | REQ-19 |
@@ -192,10 +192,10 @@ Restella가 채널에 보내는 요청의 계약이다. 실제 OTA 대신 back-e
 
 | 필드 | 설명 |
 |---|---|
-| `prepareRemaining` | 선택. 실행 전에 해당 숙박일의 남은 재고를 이 값으로 맞춘다. 총 재고를 조정하며 이벤트 로그에 시뮬레이터가 한 것으로 남는다 |
+| `prepareRemaining` | 선택. 실행 전에 해당 숙박일의 남은 재고를 이 값으로 맞춘다. 총 재고를 조정하며, 이벤트 로그에는 실행한 운영자가 한 것으로 남고 `detail.source`에 `SIMULATOR:<실행 ID>`가 붙는다 |
 | `requestCount` | 보낼 예약 수(1~100) |
 | `notifyRatio` | 통보형 채널이 보내는 비율(%). 나머지는 확인형 채널이 보낸다 |
-| `duplicateRatio` | 같은 예약을 한 번 더 보내는 비율(%). 중복 처리를 보여준다 |
+| `duplicateRatio` | 같은 예약을 한 번 더 보내는 비율(%, 0~50). 중복 처리를 보여준다 |
 
 - 시뮬레이터는 **실제 채널 API**(`/api/v1/channel/reservations`)로 서명된 요청을 동시에 보낸다. 내부 함수를 직접 부르지 않는다.
 - 응답(201)에는 확정, 거절, 충돌, 중복 건수와 실행 후 "판매 수 ≤ 총 재고" 검증 결과가 들어 있다.

@@ -2,11 +2,13 @@
 
 Restella를 AWS EC2 위의 k3s 클러스터에 배포하는 인프라 코드다. AWS 리소스는 Terraform으로, 클러스터 안의 구성은 Argo CD 기반 GitOps로 관리한다.
 
-- 기술: Terraform, k3s, Helm, Argo CD, Prometheus, Grafana
+- 기술: Terraform, k3s, Helm, Argo CD, External Secrets Operator, cert-manager (모니터링 Prometheus·Grafana는 아직 구성하지 않았다)
 - 버전: [기술 스택](../docs/2-design/tech-stack.md)
 - 네트워크 구성 결정: [ADR-0001](../docs/adr/0001-network-topology.md)
 - demo 노드의 OS와 인스턴스 결정: [ADR-0002](../docs/adr/0002-demo-node-os-and-instance.md)
 - 배포 파이프라인과 비밀값 전달: [ADR-0003](../docs/adr/0003-delivery-pipeline.md)
+- 클러스터 부트스트랩과 공통 구성: [ADR-0005](../docs/adr/0005-cluster-bootstrap.md)
+- 직접 써 보는 방법: [demo 사용 안내](../DEMO.md)
 - 비밀값 원칙: [보안](../docs/2-design/security.md)
 
 ## 환경
@@ -14,16 +16,16 @@ Restella를 AWS EC2 위의 k3s 클러스터에 배포하는 인프라 코드다.
 | | demo | prod (실무용) |
 |---|---|---|
 | 목적 | 과제 심사용 실제 배포 | 실무 기준 설계를 코드로 제시 |
-| AWS 반영 | **배포함** | **배포하지 않음** (비용 문제로 소스 코드로만 남김) |
+| AWS 반영 | **배포함** (2026-10-11) | **배포하지 않음** (비용 문제로 설계만 둔다. 2026-10-11 현재 코드는 작성하지 않았다) |
 | 네트워크 | 퍼블릭 서브넷 1개, EC2에 EIP | 퍼블릭 서브넷 2개(ALB, NAT Gateway), 프라이빗 서브넷 2개(EC2) |
 | HTTPS | Traefik + cert-manager + Let's Encrypt | ALB + ACM |
 | EC2 노출 | 인터넷에 직접 노출. 보안 그룹으로 80·443만 허용 | 공인 IP 없음. ALB에서 오는 트래픽만 허용 |
-| 검증 | 실제 배포와 동작 확인 | `terraform validate`, tflint |
+| 검증 | 실제 배포와 동작 확인 | (코드 작성 후) `terraform validate`, tflint |
 
 **공통**
 - 리전은 서울(`ap-northeast-2`), VPC 대역은 `10.0.0.0/16`이다.
-- EC2는 Amazon Linux 2023(arm64, 커널 6.18)이고 k3s 단일 노드로 운영한다. prod는 노드 수를 변수로 둔다.
-- demo 노드는 t4g.large 스팟이다. 회수되면 중지되고 다시 켜진다. 꺼지면 안 되는 기간에는 `use_spot = false`로 온디맨드로 바꾼다.
+- EC2는 Amazon Linux 2023(arm64, 커널 6.18)이고 k3s 단일 노드로 운영한다. prod는 노드 수를 변수로 둘 계획이다(현재 k3s-node 모듈은 노드 1대만 만든다).
+- demo 노드는 t4g.large 스팟이다. 회수되면 중지되고 다시 켜지도록 설정했다(회수 후 복구는 아직 시험하지 않았다). 꺼지면 안 되는 기간에는 `use_spot = false`로 온디맨드로 바꾼다.
 - SSH 포트는 열지 않고 SSM Session Manager로 접속한다.
 - Kubernetes API(6443)는 외부에 노출하지 않는다.
 - 도메인은 Route 53 호스팅 영역을 쓴다. demo는 Let's Encrypt, prod는 ACM이 도메인 소유를 확인해 인증서를 발급한다.
@@ -39,28 +41,29 @@ infra/
 │   │   ├── network/        # VPC, 서브넷, 라우팅, 인터넷 게이트웨이, (선택) NAT Gateway·S3 엔드포인트
 │   │   ├── k3s-node/       # EC2(스팟 선택), SSM용 IAM, 데이터 EBS와 일일 스냅샷, k3s 설치 user-data, (demo) EIP
 │   │   ├── ecr/            # 앱별 ECR 저장소, 수명 주기 정책
-│   │   └── alb/            # ALB, ACM 인증서, 대상 그룹 (prod 전용)
+│   │   └── alb/            # (미작성) prod 전용: ALB, ACM 인증서, 대상 그룹
 │   ├── envs/
 │   │   ├── demo/           # 실제 배포
-│   │   └── prod/           # 실무용 설계. 적용하지 않음
+│   │   └── prod/           # (미작성) 실무용 설계. 적용하지 않음
 │   └── backend.hcl.example # 환경별 backend.hcl 예시 (실제 파일은 커밋 금지)
 ├── scripts/
-│   └── put-demo-secrets.sh # Secrets Manager restella-demo에 비밀값 채우기 (사람이 실행)
+│   ├── put-demo-secrets.sh     # Secrets Manager restella-demo에 비밀값 채우기 (값은 출력하지 않음)
+│   └── bootstrap-demo-argocd.sh # SSM으로 노드에 Argo CD 설치, 클러스터 Secret, 루트 Application 등록 (최초 1회)
 └── gitops/                 # Argo CD가 감시하는 디렉토리
-    ├── bootstrap/          # Argo CD 설치 values와 환경별 루트 Application (App of Apps)
+    ├── bootstrap/          # Argo CD 설치 정의(k3s HelmChart)와 환경별 루트 Application (스크립트만 적용)
     ├── apps/
-    │   ├── demo/           # 서비스, MariaDB, 모니터링, cert-manager
-    │   └── prod/           # 서비스, MariaDB, 모니터링
-    ├── charts/             # 자체 Helm 차트: front-end, back-end, mariadb(공식 이미지 기반 StatefulSet)
+    │   ├── demo/           # argocd-bootstrap, external-secrets, cert-manager, cluster-config, mariadb, back-end·front-end(ApplicationSet)
+    │   └── prod/           # (미작성)
+    ├── charts/             # 자체 Helm 차트: cluster-config, front-end, back-end, mariadb(공식 이미지 기반 StatefulSet)
     └── values/
-        ├── demo/           # 환경별 values (kube-prometheus-stack은 단일 노드용으로 경량화)
-        └── prod/
+        ├── demo/           # 환경별 values, CI가 쓰는 <앱>-image.yaml
+        └── prod/           # (미작성)
 ```
 
 ## 모듈을 둔 이유
 
 - **같은 부품, 다른 설정:** demo와 prod는 같은 부품(`network`, `k3s-node`)을 다른 입력값으로 조립한다. 복사본 두 벌을 두면 한쪽만 고치는 실수로 환경이 어긋난다.
-- **배포하지 않는 prod 코드의 신뢰도:** prod가 쓰는 모듈은 demo에서 실제로 배포되어 동작이 확인된 코드다. prod만의 고유 코드는 `alb` 모듈과 NAT 설정으로 좁혀진다.
+- **배포하지 않는 prod 코드의 신뢰도:** prod가 쓰는 모듈은 demo에서 실제로 배포되어 동작이 확인된 코드다. prod를 작성하면 고유 코드는 `alb` 모듈(미작성)과 network 모듈의 NAT 설정(코드는 있으나 적용한 적 없음)으로 좁혀진다.
 - **공개 레지스트리 모듈(`terraform-aws-modules` 등)은 쓰지 않는다.** 서브넷과 NAT 구성 같은 판단이 코드에 드러나도록 직접 작성했다.
 
 ## demo 노드 구성 (`modules/k3s-node`)
@@ -72,7 +75,7 @@ infra/
 | 디스크 | 루트 gp3 20GiB와 데이터 gp3 10GiB, 모두 암호화. 데이터 볼륨은 인스턴스와 수명을 분리해 k3s 로컬 볼륨 경로(`/var/lib/rancher/k3s/storage`)에 마운트한다 |
 | 백업 | Data Lifecycle Manager가 데이터 볼륨을 매일 KST 03:00에 스냅샷하고 7개를 보관한다 |
 | 접속 | SSM Session Manager만 쓴다. SSH 키와 22번 포트는 없다 |
-| IMDS | IMDSv2만 허용한다. 모듈 기본 홉 제한은 1(Pod가 인스턴스 역할에 접근 불가)이고, demo는 External Secrets Operator를 위해 2로 올린다. 대신 ESO 외 네임스페이스는 NetworkPolicy로 메타데이터 주소를 막는다([아래](#배포-파이프라인과-비밀값-envsdemodeliverytf-secretstf)) |
+| IMDS | IMDSv2만 허용한다. 모듈 기본 홉 제한은 1(Pod가 인스턴스 역할에 접근 불가)이고, demo는 External Secrets Operator를 위해 2로 올린다. 대신 cluster-config가 지정한 네임스페이스(restella, argocd, kube-system, cert-manager)마다 NetworkPolicy로 메타데이터 주소를 막는다. 새 네임스페이스는 직접 추가해야 한다([ADR-0005 결정 3](../docs/adr/0005-cluster-bootstrap.md#결정-3-인스턴스-메타데이터는-네임스페이스마다-networkpolicy로-막는다). 실제 노드에서 차단 확인은 남음) |
 | k3s | 버전 고정(`v1.36.5+k3s1`), Secret 저장 시 암호화(`secrets-encryption`), kubeconfig 권한 0600 |
 | 로그 | 루트 볼륨이 넘치지 않게 상한을 두고, 넘으면 오래된 로그부터 지운다. OS·k3s 로그(journald, AL2023은 rsyslog 없음)는 500MB·14일, 컨테이너 로그는 kubelet이 10Mi × 3개, k3s 내장 containerd 로그(`/var/lib/rancher/k3s/agent/containerd/containerd.log`)는 k3s가 50MB × 3개·28일로 로테이션한다(k3s 코드에 고정). 앞의 둘은 노드가 생길 때 user-data로 설정하므로, 바꾸려면 노드를 교체하거나 SSM으로 직접 고친다 |
 | DNS | 호스팅 영역 이름과 그 하위 이름 전체(`*.`)를 노드의 EIP로 보낸다. 영역 자체는 `global`이 관리한다 |
@@ -81,7 +84,7 @@ k3s 설치 스크립트는 AL2023을 el8로 잘못 판단해 맞지 않는 SELin
 
 ## demo 적용 방법
 
-적용 순서는 **bootstrap → global → demo → 비밀값**이다. 뒤 단계가 앞 단계의 리소스를 조회하기 때문이다.
+적용 순서는 **bootstrap → global → demo → 비밀값 → Argo CD 부트스트랩**이다. 뒤 단계가 앞 단계의 리소스를 조회하기 때문이다.
 - global은 bootstrap이 만든 S3 버킷에 state를 둔다.
 - demo는 global의 GitHub OIDC 공급자와 호스팅 영역을 조회한다.
 - 비밀값 스크립트는 demo가 만든 비밀값 그릇에 값을 넣는다.
@@ -110,6 +113,9 @@ terraform -chdir=envs/demo apply
 # 4) 비밀값 채우기 (값은 모두 무작위로 만들고 출력하지 않는다)
 ../scripts/put-demo-secrets.sh
 
+# 5) Argo CD 부트스트랩 (gitops 파일이 main에 push된 뒤, 최초 1회)
+../scripts/bootstrap-demo-argocd.sh
+
 # 노드 접속
 $(terraform -chdir=envs/demo output -raw ssm_session_command)
 ```
@@ -135,7 +141,7 @@ aws ec2 describe-spot-instance-requests --filters Name=state,Values=open,active
 | Secrets Manager | `restella-demo`. 값은 Terraform 밖에서 넣는다 |
 | 노드 역할 추가 권한 | ECR 토큰 발급과 pull, `restella-demo` 비밀값 읽기. External Secrets Operator가 이 권한을 쓴다 |
 
-- ESO가 Pod에서 노드 역할을 쓰려면 IMDS 홉 제한이 2여야 한다. 대신 ESO를 뺀 모든 네임스페이스는 NetworkPolicy로 메타데이터 주소를 막는다([ADR-0003](../docs/adr/0003-delivery-pipeline.md)).
+- ESO가 Pod에서 노드 역할을 쓰려면 IMDS 홉 제한이 2여야 한다. 대신 지정한 네임스페이스마다 NetworkPolicy로 메타데이터 주소를 막는다([ADR-0005 결정 3](../docs/adr/0005-cluster-bootstrap.md#결정-3-인스턴스-메타데이터는-네임스페이스마다-networkpolicy로-막는다)).
 - 클러스터는 ESO의 ECR 토큰 생성기로 이미지 pull용 Secret을 받는다. 노드에 ECR용 바이너리를 설치하지 않는다.
 
 ### 비밀값 키
@@ -214,9 +220,9 @@ PRINT_ONLY=1 infra/scripts/bootstrap-demo-argocd.sh    # 노드에서 실행할 
 ```
 
 - 앱 Pod는 이미지 pull Secret으로 `ecr-pull`을 쓴다(`imagePullSecrets`). 레지스트리 주소는 ECR 토큰 응답에서 받으므로 Git에 없다.
-- Argo CD 관리자 초기 비밀번호는 `argocd-initial-admin-secret`에 있다. 화면 접속 경로(Ingress)는 cert-manager를 구성할 때 정한다.
+- Argo CD 관리자 초기 비밀번호는 `argocd-initial-admin-secret`에 있다. Argo CD 화면은 Ingress로 공개하지 않고 SSM 포트 포워딩으로 접속한다.
 - 새 네임스페이스를 만들면 `cluster-config`의 `blockInstanceMetadata.namespaces`에 추가한다.
-- 모든 Application은 동기화가 실패하면 5번까지 다시 시도한다. 앞 단계가 막 떠서 생기는 일시적 실패(예: cert-manager webhook의 CA 주입 전) 때문이다.
+- 모든 Application은 동기화가 실패하면 5번까지 다시 시도한다. 앞 단계가 막 떠서 생기는 일시적 실패(예: cert-manager webhook의 CA 주입 전) 때문이다. demo 첫 배포에서는 cluster-config가 ESO webhook의 엔드포인트가 생기기 전에 동기화돼 한 번 실패했고, 이 재시도로 저절로 회복했다.
 
 ### HTTPS: cert-manager + Let's Encrypt + Traefik
 
@@ -232,7 +238,7 @@ PRINT_ONLY=1 infra/scripts/bootstrap-demo-argocd.sh    # 노드에서 실행할 
 - **HTTP→HTTPS:** HTTP 요청이 301로 HTTPS에 넘어갔다. Traefik 실행 인자에 리디렉션 설정이 들어갔다.
 - **인증서 흐름:** 로컬에서는 Let's Encrypt에 접속할 수 없어서, 같은 이름의 자체 서명 발급자로 대신했다. Ingress 표시만으로 `fe.`·`api.` 인증서가 발급됐고, Traefik이 그 인증서로 응답했다. 실제 Let's Encrypt 발급자 2개는 서버 검증만 했다(계정을 만들지 않으려고).
 - **경로:** Traefik → 앱 경로가 NetworkPolicy를 통과했다. `api.` 주소에서는 문서와 채널 API(서명 없으면 401)만 열리고 운영자 API·시뮬레이터 수신 주소·`/metrics`·헬스체크는 404였다.
-- **실제 노드에서 남은 확인:** Let's Encrypt 실제 발급
+- **demo 노드 (2026-10-11):** 실제 발급자 `letsencrypt`로 `fe.`·`api.` 인증서가 발급됐다.
 
 ## gitops: front-end (`gitops/charts/front-end`)
 
@@ -309,12 +315,12 @@ PRINT_ONLY=1 infra/scripts/bootstrap-demo-argocd.sh    # 노드에서 실행할 
 - **보안 설정:** 루트 파일시스템 쓰기가 막히고, 실행 사용자가 999인 것을 확인했다.
 - **데이터 유지:** Pod를 지웠다 다시 띄워도 데이터가 남았다.
 
-**back-end 차트에 반영할 것**
+**back-end 차트에 반영함**
 - k3s의 네트워크 정책 컨트롤러는 새 Pod의 IP를 허용 목록에 넣기까지 시간차가 있어, **막 뜬 Pod의 첫 DB 연결이 실패할 수 있다**(테스트에서 재현).
 - API 서버는 NestJS TypeORM 모듈의 기본 재시도(3초 간격 9번)로 버틴다.
-- 마이그레이션·시드 Job은 재시도가 없으니 Job의 `backoffLimit`으로 다시 실행되게 한다.
+- 마이그레이션·시드 Job은 재시도가 없어 Job의 `backoffLimit`(6)으로 다시 실행되게 했다.
 
-**Argo CD 설정에 반영할 것:** 하위 Application 사이의 sync wave 순서는 Argo CD가 Application의 상태(health)를 판단해야 지켜진다. Argo CD 설치 values(`gitops/bootstrap`)에 Application 상태 판단 설정을 넣는다.
+**Argo CD 설정에 반영함:** 하위 Application 사이의 sync wave 순서는 Argo CD가 Application의 상태(health)를 판단해야 지켜진다. Argo CD 설치 정의(`bootstrap/demo/argocd.yaml`)에 Application 상태 판단 설정을 넣었다.
 
 ## Terraform state
 
@@ -339,9 +345,9 @@ state 파일 경로(`key`)는 스택마다 다르다: `global/terraform.tfstate`
 
 ## 배포 흐름 (demo)
 
-1. `infra/terraform/envs/demo`에서 `terraform apply`를 실행한다. VPC, 퍼블릭 서브넷, EC2, EIP, 데이터 EBS가 생기고, user-data가 k3s를 설치한다.
-2. 최초 1회만 Helm으로 Argo CD를 설치하고 demo 루트 Application을 등록한다(`gitops/bootstrap`).
-3. 이후 배포는 모두 Git으로 한다. Argo CD가 `gitops/apps/demo`를 감시해서 서비스, DB, 모니터링, cert-manager를 동기화한다.
+1. `infra/terraform/envs/demo`에서 `terraform apply`를 실행한다. VPC, 퍼블릭 서브넷, EC2, EIP, 데이터 EBS, Route 53 레코드(영역 이름, `*.`)가 생기고, user-data가 k3s를 설치한다.
+2. 최초 1회 `infra/scripts/bootstrap-demo-argocd.sh`가 SSM으로 노드에 Argo CD(k3s HelmChart)를 설치하고, 클러스터 Secret(레지스트리·도메인)과 demo 루트 Application을 등록한다. 루트는 이 스크립트만 적용한다.
+3. 이후 배포는 모두 Git으로 한다. Argo CD가 `gitops/apps/demo`를 감시해서 Argo CD 자신의 설치 정의, ESO, cert-manager, 클러스터 공통 설정, DB, 서비스를 sync wave 순서로 동기화한다.
 4. 코드가 바뀌면 GitHub Actions가 테스트와 이미지 빌드를 하고 ECR에 푸시한다. 그다음 `gitops/values/demo`에 이미지 다이제스트(sha256)를 커밋하고, Argo CD가 이 커밋을 반영한다.
 
 ## 앱 배포 워크플로 (`.github/workflows`)
@@ -379,6 +385,24 @@ test (ubuntu-24.04) → build (ubuntu-24.04-arm): ECR 푸시 → deploy (ubuntu-
 terraform -chdir=infra/terraform/envs/demo output -raw github_actions_role_arn | gh secret set AWS_ROLE_ARN_DEMO --repo vsfirst/restella
 ```
 
+## demo 배포 결과 (2026-10-11)
+
+| 항목 | 결과 |
+|---|---|
+| Terraform | bootstrap·global·envs/demo 적용. 노드(t4g.large 스팟, AL2023 arm64)에서 k3s v1.36.5 Ready, 데이터 볼륨 마운트, 로그 상한 적용 |
+| Argo CD | 모든 Application이 Synced/Healthy |
+| ESO | 노드 역할로 동작: ClusterSecretStore `aws-secrets-manager` Valid, ECR pull Secret `ecr-pull` 동기화 |
+| HTTPS | Let's Encrypt 실제 발급자로 `fe.`·`api.` 인증서 발급. HTTP는 301로 HTTPS 이동 |
+| CI | 두 앱 워크플로가 ECR 푸시와 gitops 다이제스트 커밋까지 성공. 공개 로그에 계정 ID 노출 없음 |
+
+**배포 중 생긴 문제**
+1. **보안 그룹 규칙 설명:** 한글 설명을 AWS가 거부했다. 영문으로 바꾸고 `k3s-node` 모듈 변수에 형식 검사를 넣었다.
+2. **첫 CI의 AWS 역할:** OIDC `sub` 형식이 신뢰 조건과 달라 역할을 맡지 못했다. 신뢰 조건을 변경 불가 subject(`github_oidc_subject_prefix`)로 바꿨다.
+3. **Argo CD 순환 대기:** `argocd-bootstrap`과 루트가 서로를 기다려 멈췄다([ADR-0005 결정 1](../docs/adr/0005-cluster-bootstrap.md#결정-1-argo-cd는-k3s-내장-helmchart로-설치하고-그-뒤로는-argo-cd가-스스로-관리한다)). Git을 고친 뒤, 노드에서 새 `argocd-bootstrap` 정의를 직접 적용하고 `root-demo`의 `argocd.argoproj.io/tracking-id` annotation을 지워 풀었다.
+4. **cluster-config 첫 동기화:** ESO webhook이 준비되기 전이라 실패했고, 재시도로 저절로 회복했다.
+
+**아직 하지 않은 것:** 모니터링(Prometheus·Grafana), prod 코드, 실제 노드의 메타데이터 차단 확인, 스팟 회수 복구 시험, p95 부하 테스트.
+
 ## 운영 원칙
 
 - 저장소가 public이므로 비밀값·민감 정보·개인정보는 Git에 절대 두지 않는다. 계정 ID와 state 버킷 이름도 코드에 적지 않고 실행 시점에 읽거나 커밋하지 않는 파일에 둔다.
@@ -387,4 +411,4 @@ terraform -chdir=infra/terraform/envs/demo output -raw github_actions_role_arn |
 
 ## 참고
 
-Grafana Helm 차트는 `grafana-community` 저장소로 옮겨졌다. kube-prometheus-stack 92.2.0도 `oci://ghcr.io/grafana-community/helm-charts`를 참조한다.
+(모니터링을 구성할 때 참고) Grafana Helm 차트는 `grafana-community` 저장소로 옮겨졌다. kube-prometheus-stack 92.2.0도 `oci://ghcr.io/grafana-community/helm-charts`를 참조한다.

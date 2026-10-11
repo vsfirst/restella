@@ -27,7 +27,7 @@ erDiagram
   operator ||--o{ conflict : "처리"
   channel ||--o{ channel_availability : ""
   room_type ||--o{ channel_availability : ""
-  room_type ||--o{ simulation_run : ""
+  room_type ||..o{ simulation_run : "참조만"
 
   room_type {
     int id PK
@@ -90,7 +90,7 @@ erDiagram
     int id PK
     datetime occurred_at
     enum type
-    varchar actor "SYSTEM | OPERATOR:id | CHANNEL:code | SIMULATOR:id"
+    varchar actor "SYSTEM | OPERATOR:id | CHANNEL:code (시뮬레이터 실행은 detail.source)"
     int reservation_id "참조만, FK 없음"
     int channel_id
     int room_type_id
@@ -104,18 +104,20 @@ erDiagram
   }
   simulation_run {
     int id PK
-    int room_type_id FK
+    int room_type_id "참조만, FK 없음"
     date check_in
     date check_out
     int request_count
     int notify_ratio "통보형 비율(%)"
+    int duplicate_ratio "중복 비율(%)"
+    int prepare_remaining "실행 전 남은 재고 맞춤값, 없으면 NULL"
     json result "건수, 불변식 검증 결과"
     datetime started_at
     datetime finished_at
   }
 ```
 
-모든 테이블에는 `created_at`, `updated_at`이 있다. 그림에서는 생략했다.
+`channel_availability`, `event_log`, `simulation_run`을 뺀 테이블에는 `created_at`, `updated_at`이 있다. 그림에서는 생략했다.
 
 ID와 외래 키는 `INT UNSIGNED`다. 계속 커지는 `revision` 계열만 `BIGINT`다. 구현 단계에서 BIGINT에서 바꿨다([구현 노트](../3-development/back-end.md)).
 

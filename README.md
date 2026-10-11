@@ -20,17 +20,17 @@ flowchart LR
 
 | 단계 | 사람이 정한 것 | AI가 한 일 | 상태 |
 |---|---|---|---|
-| 1. 기획 | 문제를 "멀티채널 판매 숙소의 오버부킹"으로 정함. 요구사항과 수치 목표 확정 | 문제 후보 3개(오버부킹, 하우스키핑 상태 불일치, 노쇼) 비교와 추천. 요구사항 28개(기능 20, 품질 8)와 완료 조건 초안 | 완료. 문제 정의 보강 남음 |
+| 1. 기획 | 문제를 "멀티채널 판매 숙소의 오버부킹"으로 정함. 요구사항과 수치 목표 확정 | 문제 후보 3개(오버부킹, 하우스키핑 상태 불일치, 노쇼) 비교와 추천. 요구사항 28개(기능 20, 품질 8)와 완료 조건 초안 | 진행 중. 문제 정의 보강, 범위 확정, CLAUDE.md 남음 |
 | 2. 디자인 | 화면 설계는 레포 안 HTML 목업으로. 시뮬레이터는 back-end 안 모듈로. 설계 확정 | 도메인 모델·잠금 순서·API 설계. 동시성·중복·동기화·실시간 알림 방식 비교([ADR-0004](docs/adr/0004-reservation-consistency-and-sync.md)). 목업과 스크린샷 10장 | 완료 |
 | 3. 개발 | DTO는 NestJS 관례대로. FSD `entities`·`features` 없애고 `widgets`는 유지. 오류 응답은 RFC 9457 | back-end 모듈 9개, front-end 화면 7개와 BFF, 컨테이너 이미지 | 완료. 코드 리뷰 대기 |
-| 4. 테스트 | 결과 확인 | 불변식 테스트를 먼저 작성. 동시성은 실제 MariaDB로, 시연 시나리오는 실제 브라우저로 검증. 테스트로 문제 12건을 찾아 고침 | 로컬 완료. demo 검증 남음 |
-| 인프라 | demo(실제 배포)와 prod(코드만) 분리. OS는 Amazon Linux 2023(AI는 Ubuntu 추천). t4g.large 스팟. Route 53은 공용 `global` 스택으로. 비밀값은 1개에 `fe`·`be` 키 2개. 워크플로는 앱별로. 노드는 gitops 준비 뒤에 | Terraform(bootstrap·global 적용, demo는 ECR·비밀값·CI 역할만 적용), 앱별 CI 워크플로, MariaDB 차트, Argo CD·ESO 클러스터 구성. 같은 버전의 k3s를 로컬에 띄워 검증. 결정 기록([ADR-0001~0003, 0005](docs/adr/)) | 진행 중 |
+| 4. 테스트 | 결과 확인 | 불변식 테스트를 먼저 작성. 동시성은 실제 MariaDB로, 시연 시나리오는 실제 브라우저로 검증. 테스트로 문제 12건을 찾아 고침 | 로컬 완료. demo 배포·HTTPS 확인. 부하(p95)·스팟 회수 복구·되돌리기 검증 남음 |
+| 인프라 | demo(실제 배포)와 prod(코드만) 분리. OS는 Amazon Linux 2023(AI는 Ubuntu 추천). t4g.large 스팟. Route 53은 공용 `global` 스택으로. 비밀값은 1개에 `fe`·`be` 키 2개. 워크플로는 앱별로. 노드는 gitops 준비 뒤에 | Terraform(bootstrap·global·demo 모두 적용), 앱별 CI 워크플로(테스트 → arm64 빌드 → ECR → 다이제스트 커밋), Helm 차트 4개(front-end·back-end·mariadb·cluster-config), Argo CD·ESO·cert-manager 구성과 demo 배포(Let's Encrypt HTTPS). 같은 버전의 k3s를 로컬에 띄워 먼저 검증. 결정 기록([ADR-0001~0003, 0005](docs/adr/)) | 진행 중. demo 배포 완료. 모니터링·prod 코드 남음 |
 
 ### AI 결과를 검증한 방법
 
 - **불변식 테스트 먼저:** "판매 수 ≤ 총 재고", "같은 예약은 한 번만"을 테스트로 먼저 고정하고 구현했다.
 - **실제 출력이 기준:** 버전과 API는 기억이 아니라 레지스트리, 공식 문서, 실제 도구의 출력으로 확인했다.
-- **새 컨텍스트에서 리뷰:** 구현과 분리된 컨텍스트에서 `/code-review`로 리뷰하고, 지적마다 반영·기각과 이유를 [코드 리뷰 기록](docs/3-development/code-review.md)에 남긴다.
+- **새 컨텍스트에서 리뷰:** 구현과 분리된 컨텍스트에서 `/code-review`로 리뷰하고, 지적마다 반영·기각과 이유를 [코드 리뷰 기록](docs/3-development/code-review.md)에 남긴다(리뷰는 아직 실행 전이다).
 - **사람이 최종 판정:** 리뷰어와 구현자가 같은 모델 계열이다. 그래서 마지막 관문은 테스트와 사람의 판정이다.
 
 이 과정에서 AI의 실수나 놓친 점을 잡은 사례다.
@@ -43,6 +43,8 @@ flowchart LR
 | [#4 E2E 교착](docs/ai-log.md#4-e2e-테스트가-드러낸-교착-p2) | 실패를 덮지 않고 원인을 분리함. 교착 대비 재시도 장치 추가 |
 | [#5 DTO 누락](docs/ai-log.md#5-dto-위치와-응답-dto-누락-p2) | AI가 묻지 않고 관례에서 벗어난 구조를 택한 것을 사람이 지적함 |
 | [#6 front-end E2E](docs/ai-log.md#6-front-end-e2e가-드러낸-문제-p3) | 테스트 실패를 추적하다 비밀번호가 URL에 실릴 수 있는 문제를 찾음 |
+| [#7 부트스트랩 테스트](docs/ai-log.md#7-잘못된-이유로-통과한-부트스트랩-테스트-p4) | 로컬 테스트가 입력이 비어 있어 통과한 것을 demo 배포에서 발견함(Argo CD 순환 대기) |
+| [#8 plan이 통과시킨 오류](docs/ai-log.md#8-plan이-통과시킨-두-가지-오류-p4) | plan이 못 잡는 AWS·GitHub의 실제 규칙(보안 그룹 설명, OIDC subject)을 실제 값으로 확인함 |
 
 ### 문서
 
@@ -290,15 +292,18 @@ flowchart LR
 
 ### 검증 결과
 
-로컬 환경에서 확인한 결과다(시뮬레이션·화면 2026-10-10, 자동 테스트 재실행 2026-10-11). demo 배포 결과는 배포하면서 추가한다.
+로컬 환경(시뮬레이션·화면 2026-10-10, 자동 테스트 재실행 2026-10-11)과 demo 환경(2026-10-11 배포)에서 확인한 결과다. demo의 부하(p95)·스팟 회수 복구·되돌리기 검증은 남았다. 직접 써 보는 방법은 [demo 사용 안내](DEMO.md)에 있다.
 
 | 확인 항목 | 결과 |
 |---|---|
 | 마지막 1실에 동시 예약 50건<br/>(확인형·통보형·중복 요청 섞음) | 확정 1 · 거절 26 · 충돌 18 · 중복 5, **초과 판매 0건**, 0.14초 |
 | 채널 동기화 | 5개 채널 모두 남은 재고 0(판매 중지)을 받음 |
 | 자동 테스트 (back-end) | 단위 20개, 통합·E2E 60개 모두 통과. 라인 커버리지 94.7% |
-| 자동 테스트 (front-end) | 단위 21개 모두 통과 |
+| 자동 테스트 (front-end) | 단위 21개, E2E(Playwright) 2개 모두 통과 |
 | 운영자 콘솔 (front-end) | "마지막 1실" 시연 시나리오 전체를 실제 브라우저로 검증. 충돌 알림이 새로고침 없이 5초 안에 뜨고, 5개 채널 모두 판매 중지를 받음 |
+| 차트 검증 | 같은 버전 k3s(v1.36.5)를 로컬 Docker에 띄워 차트를 배포하고 Playwright E2E 통과 |
+| CI | 앱별 워크플로가 테스트 → arm64 빌드 → ECR 푸시 → 이미지 다이제스트 커밋까지 성공 |
+| demo 배포 (AWS) | `fe.`·`api.` 도메인에 Let's Encrypt 인증서 발급, HTTP는 301로 HTTPS 이동. Argo CD Application 8개 모두 Synced/Healthy, 마이그레이션·시드 Job 완료 |
 
 자세한 내용은 [테스트 결과 보고서](docs/4-testing/test-report.md)에 있다.
 
@@ -311,7 +316,7 @@ flowchart LR
 | 실제 OTA API 연동 | 파트너 계약이 필요하다 | back-end 안의 `simulator` 모듈이 실제 채널과 같은 HTTP 계약으로 채널 5개를 흉내 낸다 |
 | 결제, 요금, 회원, 객실 배정, 여러 숙소 | 오버부킹 문제와 관계가 없다 | - |
 | Redis 분산 락, 메시지 큐 | DB 트랜잭션으로 충분하다 | MariaDB 행 잠금과 동기화 상태 테이블 ([ADR-0004](docs/adr/0004-reservation-consistency-and-sync.md)) |
-| 고가용성(멀티 노드, 관리형 DB) | 과제 규모에 비해 비싸다 | EC2 1대 + 매일 EBS 스냅샷. 실무용 설계는 코드로만 둔다 |
+| 고가용성(멀티 노드, 관리형 DB) | 과제 규모에 비해 비싸다 | EC2 1대 + 매일 EBS 스냅샷. 실무용 설계(prod)는 코드로만 둔다(작성 예정) |
 
 ## 전체 구조
 
@@ -321,7 +326,7 @@ flowchart LR
 flowchart LR
   OP((운영자)) --> ING
   subgraph EC2["demo: AWS EC2 1대 · k3s"]
-    ING[Traefik Ingress] --> FE["front-end<br/>Next.js · BFF · iron-session"]
+    ING["Traefik Ingress<br/>HTTPS · Let's Encrypt"] -->|"fe.&lt;도메인&gt;"| FE["front-end<br/>Next.js · BFF · iron-session"]
     subgraph BE["back-end · NestJS · TypeORM"]
       CORE["운영자 API · 채널 API<br/>재고 원장 · 충돌 · 동기화 발송기"]
       SIM["simulator 모듈<br/>채널 5개를 흉내"]
@@ -330,8 +335,8 @@ flowchart LR
     DB[(MariaDB)]
     FE -->|REST + 액세스 토큰| CORE
     CORE --> DB
-    PROM[Prometheus] -. 지표 수집 .-> CORE
-    GRAF[Grafana] --> PROM
+    ING -->|"api.&lt;도메인&gt;<br/>채널 API · 문서"| CORE
+    PROM["Prometheus · Grafana<br/>(구성 예정)"] -. 지표 수집 .-> CORE
     ARGO[Argo CD]
   end
   CI[GitHub Actions] -->|이미지 푸시| ECR[(ECR)]
@@ -339,7 +344,7 @@ flowchart LR
   GIT -->|변경 감지| ARGO
   ARGO -.->|배포| FE & BE & DB
   ECR -.->|이미지 pull| EC2
-  SM[(Secrets Manager)] -.->|비밀값| BE
+  SM[(Secrets Manager)] -.->|"비밀값 (ESO)"| FE & BE & DB
 ```
 
 | 구성 요소 | 역할 | 기술 |
@@ -347,20 +352,21 @@ flowchart LR
 | front-end | 운영자 콘솔. 세션을 보관하고 back-end API를 대신 호출하는 BFF | Next.js, iron-session, TanStack Query, Tailwind CSS, FSD |
 | back-end | 재고 원장, 예약 수신·취소, 채널 동기화, 충돌 관리. 채널을 흉내 내는 `simulator` 모듈도 이 앱 안에 있다 | NestJS, TypeORM, Swagger |
 | DB | 재고, 예약, 충돌, 이벤트 저장 | MariaDB |
-| infra | EC2 1대 위의 k3s 클러스터, GitOps 배포, 모니터링 | Terraform, k3s, Helm, Argo CD, Prometheus, Grafana |
+| infra | EC2 1대 위의 k3s 클러스터, GitOps 배포, HTTPS, 모니터링(구성 예정) | Terraform, k3s, Helm, Argo CD, cert-manager, Traefik, (예정) Prometheus·Grafana |
 | CI | 테스트, 이미지 빌드·푸시, 이미지 다이제스트를 gitops에 반영 | GitHub Actions, ECR |
 | 비밀값 | DB 비밀번호, 세션 키 등을 클러스터에 전달 | AWS Secrets Manager, External Secrets Operator |
 
 - 운영자는 front-end에만 접속한다. 로그인 토큰은 front-end 서버의 암호화 쿠키에 있고, 브라우저 요청은 front-end를 거쳐 back-end로 간다.
 - 채널은 back-end의 채널 API를 HTTP로 호출하고, 남은 재고도 HTTP로 받는다. 데모에서는 back-end 안의 `simulator` 모듈이 채널 역할을 한다. 이 모듈은 실제 채널과 같은 HTTP 계약만 쓰고 내부 코드를 직접 부르지 않는다. 그래서 나중에 실제 OTA 연결이나 별도 앱으로 바꾸기 쉽다.
 - 모든 구성 요소는 AWS EC2 1대의 k3s 클러스터에서 실행되고, Argo CD가 Git의 `infra/gitops`를 기준으로 배포한다.
-- 인프라는 두 환경으로 나뉜다. 위 그림은 실제로 배포하는 **demo**(퍼블릭 EC2, Let's Encrypt)다. **prod**는 ALB·NAT·프라이빗 서브넷을 쓰는 실무용 설계로, 비용 문제로 배포하지 않고 코드로만 둔다([ADR-0001](docs/adr/0001-network-topology.md)).
+- 인프라는 두 환경으로 나뉜다. 위 그림은 실제로 배포하는 **demo**(퍼블릭 EC2, Let's Encrypt)다. **prod**는 ALB·NAT·프라이빗 서브넷을 쓰는 실무용 설계로, 비용 문제로 배포하지 않고 코드로만 둔다. prod 코드는 아직 작성 전이다([ADR-0001](docs/adr/0001-network-topology.md)).
 
 ### 디렉토리 구조
 
 ```
 restella/
 ├── README.md                   # 작업 과정과 문서, 서비스 소개, 전체 구조
+├── DEMO.md                     # demo 사용 안내 (면접관용)
 ├── compose.yaml                # 로컬 전체 실행 (Docker): MariaDB → back-end → front-end
 ├── .env.example                # compose.yaml이 읽는 로컬 값의 예시 (.env는 커밋하지 않음)
 ├── .github/workflows/          # CI: 테스트 → 이미지 빌드·ECR 푸시 → gitops에 이미지 다이제스트 반영
@@ -388,16 +394,17 @@ restella/
 │   │   └── modules/            # 도메인 모듈
 │   └── test/                   # e2e, 동시성 통합 테스트
 └── infra/                      # README.md: infra 설계
-    ├── terraform/              # AWS 리소스 (VPC, EC2, EBS, ALB 등)
+    ├── terraform/              # AWS 리소스 (VPC, EC2, EBS, ECR, IAM, Route 53 등)
     │   ├── bootstrap/          # Terraform state용 S3 버킷
     │   ├── global/             # 환경들이 함께 쓰는 계정 단위 리소스: Route 53 호스팅 영역, GitHub Actions OIDC 공급자
-    │   ├── modules/            # network, k3s-node, ecr, alb
-    │   └── envs/               # demo(실제 배포), prod(실무용 설계, 배포 안 함)
+    │   ├── modules/            # network, k3s-node, ecr (alb는 prod용, 작성 예정)
+    │   └── envs/               # demo(실제 배포), prod(실무용 설계, 작성 예정)
+    ├── scripts/                # demo 비밀값 입력, Argo CD 최초 설치(SSM)
     └── gitops/                 # Argo CD가 감시하는 디렉토리
         ├── bootstrap/          # Argo CD 설치와 환경별 루트 Application
-        ├── apps/               # 환경별 하위 Application 정의 (demo, prod)
-        ├── charts/             # 자체 Helm 차트: front-end, back-end, mariadb
-        └── values/             # 환경별 values (demo, prod)
+        ├── apps/               # 환경별 하위 Application 정의 (demo. prod는 작성 예정)
+        ├── charts/             # 자체 Helm 차트: front-end, back-end, mariadb, cluster-config
+        └── values/             # 환경별 values (demo. prod는 작성 예정)
 ```
 
 front-end는 FSD(Feature-Sliced Design) 구조를 따른다. FSD의 `app`·`pages` 레이어는 Next.js 라우터와 이름이 겹치지 않도록 `_app`·`_pages`로 둔다.

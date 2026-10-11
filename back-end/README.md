@@ -24,7 +24,7 @@ Restella의 **재고 원장 API**다. 모든 채널의 예약을 하나의 재�
 | API | 호출자 | 인증 |
 |---|---|---|
 | 운영자 API | front-end BFF만 | back-end가 발급한 토큰 |
-| 채널 웹훅 API | 채널(시뮬레이터) | 채널별 API 키와 HMAC 서명 |
+| 채널 웹훅 API | 채널(시뮬레이터) | 채널별 비밀 키로 만든 HMAC 서명 |
 
 - 두 API는 경로와 인증을 분리한다.
 - API 명세는 Swagger로 자동 생성한다.
@@ -57,7 +57,8 @@ Restella의 **재고 원장 API**다. 모든 채널의 예약을 하나의 재�
 back-end/
 ├── src/
 │   ├── common/         # 예외 필터, 인터셉터, 가드, 데코레이터, 공용 DTO(날짜 범위)
-│   ├── config/         # 환경변수 검증, TypeORM·Swagger 설정
+│   ├── config/         # 환경변수 검증, TypeORM 설정
+│   ├── app.setup.ts    # 전역 검증 파이프, 요청 ID, Swagger 설정 (main과 테스트가 함께 쓴다)
 │   ├── database/
 │   │   ├── migrations/ # TypeORM 마이그레이션
 │   │   └── seeds/      # 데모 데이터 (가짜 값만)
@@ -87,7 +88,8 @@ back-end/
   - 남은 재고는 동기화 계약대로 받는다. 수신 주소는 `/internal/simulator/channels/{channelCode}/availability`이고 Ingress에 노출하지 않는다.
 - **import 금지:** 다른 도메인 모듈(`inventory`, `reservation` 등)의 서비스나 리포지토리를 import하지 않는다. 설정과 공용 유틸만 쓴다. 구현할 때 린트 규칙으로 막는다.
 - **수신 쪽 규칙:** 채널 쪽 규칙도 흉내 낸다. 이미 받은 `revision`보다 오래된 값은 무시한다.
-- **장애 주입:** 재시도를 시연하려고 채널별로 실패율과 지연을 줄 수 있다. 예: OTA C는 30% 확률로 시간 초과.
+- **장애 주입:** 재시도를 시연하려고 채널별로 실패율과 지연을 줄 수 있다. 예: OTA C는 30% 확률로 503을 응답한다. 지연(`delayMs`)을 3초 넘게 주면 시간 초과가 된다.
+- **replicas 1:** 가짜 채널이 받은 값은 Pod 메모리에 있고, 시드가 채널 주소를 자기 자신(`SIMULATOR_TARGET_URL=http://localhost:3000`)으로 만든다. 그래서 배포는 replicas 1로 고정한다.
 
 이렇게 두면 나중에 별도 앱으로 떼어내거나 실제 OTA 연결 코드로 바꿀 때 Restella 쪽 코드는 바뀌지 않는다.
 
@@ -106,13 +108,13 @@ Testcontainers로 운영과 같은 MariaDB 12.3.3을 띄우고, 앱을 실제 �
 | 종류 | 위치 | 개수 |
 |---|---|---|
 | 단위 (Vitest) | `src/**/*.spec.ts` | 20 |
-| 통합·E2E (Vitest + Testcontainers) | `test/*.e2e-spec.ts` | 56 |
+| 통합·E2E (Vitest + Testcontainers) | `test/*.e2e-spec.ts` | 60 (8개 파일) |
 
 결과와 커버리지는 [테스트 결과 보고서](../docs/4-testing/test-report.md)에 있다.
 
 ## 관측
 
-- `/metrics`로 Prometheus 지표를 낸다.
+- `/metrics`로 Prometheus 지표를 낸다(수집하는 Prometheus와 대시보드는 아직 배포하지 않았다).
   - `restella_reservations_total{result}`: 예약 확정·거절·충돌·중복 건수
   - `restella_sync_latency_seconds`: 채널 동기화 지연
   - `restella_sync_failures_total`: 동기화 실패
@@ -135,7 +137,7 @@ docker compose logs -f back-end
 | 서비스 | 하는 일 |
 |---|---|
 | `mariadb` | MariaDB 12.3.3 (utf8mb4, UTC). 데이터는 `restella_mariadb-data` 볼륨 |
-| `back-end-migrate` | 마이그레이션과 시드를 한 번 실행하고 끝난다. 운영의 Argo CD PreSync Job과 같은 역할이다 |
+| `back-end-migrate` | 마이그레이션과 시드를 한 번 실행하고 끝난다. 운영의 Argo CD Sync 훅 Job(wave 0)과 같은 역할이다 |
 | `back-end` | API 서버. 마이그레이션이 성공해야 뜨고, `/health/ready`(DB 연결)로 상태를 본다 |
 
 이미지는 [Dockerfile](Dockerfile)로 만든다. `node:24.21.0-trixie-slim` 위에 컴파일 결과와 실행용 의존성만 담고, root가 아닌 `node` 사용자로 실행한다. `.env`는 이미지에 들어가지 않는다(`.dockerignore`).

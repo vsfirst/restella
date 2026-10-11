@@ -44,7 +44,7 @@ back-end에 구현된 엔드포인트 전체다. 코드의 라우트 선언과 �
 | PUT | `/api/v1/simulations/faults` | 장애 주입 설정 `{ faults: { OTA_C: { failureRate, delayMs } } }` | REQ-12 시연 |
 | DELETE | `/api/v1/simulations/channels-state` | 가짜 채널이 받은 값 초기화 | 데모·테스트 |
 
-## 내부 경로 (Ingress 비공개)
+## 내부·기타 경로 (`/api/docs`만 Ingress로 공개)
 
 | 메서드 | 경로 | 호출자 | 인증 | 설명 |
 |---|---|---|---|---|
@@ -53,7 +53,7 @@ back-end에 구현된 엔드포인트 전체다. 코드의 라우트 선언과 �
 | GET | `/internal/simulator/channels` | 테스트·디버깅 | 없음 | 가짜 채널이 받은 상태 |
 | GET | `/health/live` | Kubernetes | 없음 | 생존 확인 |
 | GET | `/health/ready` | Kubernetes | 없음 | 준비 확인 (DB 연결) |
-| GET | `/metrics` | Prometheus | 없음 | Prometheus 지표 |
+| GET | `/metrics` | Prometheus (구성 예정) | 없음 | Prometheus 형식 지표 |
 | GET | `/api/docs`, `/api/docs-json` | 심사자 | 없음 | Swagger 문서 (`api.<도메인>`으로 공개) |
 
 ## 유지 규칙

@@ -39,7 +39,7 @@ GitHub Actions ──(1) 이미지 빌드·푸시──▶ ECR (restella-demo/fr
 |---|---|
 | kubelet용 ECR 자격 증명 도우미(`ecr-credential-provider`) | 기각. k3s는 이 도우미를 지원하지만, 바이너리를 공식 배포 파일로 받을 경로가 없어 직접 빌드해야 한다 |
 | 노드에서 주기적으로 `registries.yaml` 갱신 | 기각. ECR 토큰이 12시간마다 만료되는데, k3s는 이 파일을 시작할 때만 읽어서 갱신할 때마다 재시작해야 한다 |
-| **External Secrets Operator의 ECR 토큰 생성기** | **채택.** 이미 비밀값 전달에 쓰는 ESO가 노드 역할로 12시간짜리 토큰을 받아 이미지 pull용 Secret을 주기적으로 갱신한다. 노드에 바이너리를 설치할 필요가 없다 |
+| **External Secrets Operator의 ECR 토큰 생성기** | **채택.** 이미 비밀값 전달에 쓰는 ESO가 노드 역할로 12시간짜리 토큰을 받아 이미지 pull용 Secret을 주기적으로 갱신한다. 노드에 바이너리를 설치할 필요가 없다. demo 노드에서 노드 역할로 `ecr-pull` Secret이 동기화되는 것을 확인했다(2026-10-11) |
 
 ### 3. 비밀값: AWS Secrets Manager + External Secrets Operator
 
@@ -51,6 +51,6 @@ GitHub Actions ──(1) 이미지 빌드·푸시──▶ ECR (restella-demo/fr
 
 - **노드 권한 노출을 막아야 한다.** ESO는 노드 IAM 역할을 쓴다(k3s에서는 서비스 계정별 IAM 역할을 쓰기 어렵다). 그러려면 Pod가 인스턴스 메타데이터에 닿아야 해서 IMDS 홉 제한을 2로 올렸다. 그 결과 다른 Pod도 노드 권한(ECR 읽기, `restella-demo` 비밀값 읽기, SSM)을 얻을 수 있게 된다.
   - 노드 역할의 권한을 지정한 저장소와 비밀값으로 좁혔다.
-  - `infra/gitops`에서 **ESO를 제외한 모든 네임스페이스가 메타데이터 주소(169.254.169.254)에 접근하지 못하게** NetworkPolicy를 둔다. k3s는 NetworkPolicy를 기본으로 지원한다.
-- **배포 순서가 정해진다.** bootstrap → global(OIDC 공급자 포함) → demo 순으로 적용해야 한다. global은 bootstrap의 버킷에 state를 두고, demo는 global의 OIDC 공급자를 조회하기 때문이다.
+  - `cluster-config`가 지정한 네임스페이스(restella, argocd, kube-system, cert-manager)마다 **메타데이터 주소(169.254.169.254)를 막는 NetworkPolicy**를 둔다. 새 네임스페이스는 목록에 직접 추가해야 한다([ADR-0005 결정 3](0005-cluster-bootstrap.md#결정-3-인스턴스-메타데이터는-네임스페이스마다-networkpolicy로-막는다)). k3s는 NetworkPolicy를 기본으로 지원한다. 실제 노드에서 차단되는지는 아직 확인하지 않았다.
+- **배포 순서가 정해진다.** bootstrap → global(OIDC 공급자 포함) → demo → 비밀값 → Argo CD 부트스트랩([ADR-0005](0005-cluster-bootstrap.md)) 순으로 적용해야 한다. global은 bootstrap의 버킷에 state를 두고, demo는 global의 OIDC 공급자를 조회하기 때문이다.
 - **노드가 ARM(t4g)이다.** 그래서 이미지는 arm64로 빌드한다.

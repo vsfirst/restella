@@ -45,5 +45,5 @@
 
 ## 남은 일
 
-- Dockerfile(arm64)과 CI(GitHub Actions → ECR → gitops)는 infra 단계에서 작성한다.
+- (완료) Dockerfile(arm64)과 CI(`.github/workflows/demo-back-end.yaml`: 테스트 → arm64 빌드 → ECR 푸시 → gitops 다이제스트 커밋)를 작성하고 demo에 배포했다([infra 설계](../../infra/README.md)).
 - 코드 리뷰(`/code-review`)를 하고 [코드 리뷰 기록](code-review.md)을 남긴다.

@@ -62,7 +62,7 @@
 | 2026-10-11 | GitHub OIDC 공급자를 bootstrap에서 global로 옮김 (AI 권장안 채택) | bootstrap의 state는 로컬 파일이라 잃어버리기 쉽다는 이유로 권장. 적용 전이라 state 이동 없이 파일만 옮기고, 출력·주석·ADR-0003·infra README·적용 순서(bootstrap → global → demo)를 고침. AWS에 OIDC 공급자와 state 버킷이 아직 없어 가져오기(import)가 필요 없음을 확인. bootstrap plan: S3 관련 7개 생성 |
 | 2026-10-11 | GitHub에 public으로 올림. 소유자 외에는 아무도 쓰거나 고칠 수 없게 | 올리기 전에 커밋 대상 364개 파일을 검사: 제외 대상 파일 없음, 실제 도메인·계정 ID·개인 이메일·로컬 경로·공인 IP 없음(AWS에서 실제 값을 읽어 대조, 값은 출력하지 않음), gitleaks 0건, 작성자는 noreply. 첫 커밋 후 `gh`로 저장소 생성·푸시. 협업자 없음, 이슈·위키·프로젝트·토론 끔, 상호작용 제한(협업자만, 6개월), secret scanning·push protection, Actions 토큰 읽기 전용, 외부 기여자 워크플로 승인 필수로 설정하고 API로 다시 읽어 확인. 포크는 막을 수 없고 상호작용 제한은 6개월마다 다시 걸어야 함을 [보안](2-design/security.md#저장소-쓰기-권한)에 기록 |
 | 2026-10-11 | bootstrap apply 승인 | plan을 파일로 저장해 승인된 7개만 적용. 버킷의 버전 관리·공개 차단·암호화·HTTP 거부를 AWS에서 다시 읽어 확인. backend.hcl과 tfvars를 AWS 값으로 만들고(커밋 제외 확인, 값은 출력하지 않음) global plan 실행: 영역 가져오기 1, OIDC 공급자 생성 1. plan에서 영역 설명을 덮어써 기존 운영 메모(위임 출처)가 사라지는 것을 발견해 `ignore_changes = [comment]`로 막음. 공개 DNS의 NS 위임이 Route 53 영역 네임서버와 일치함을 확인 |
-| 2026-10-11 | global apply 승인 | 저장한 plan대로 적용(영역 가져오기 1, OIDC 공급자 생성 1, 태그 변경 1). 다시 plan해 변경 없음 확인. 이어서 demo plan(적용 안 함): 31개 생성, 변경·삭제 없음. plan JSON에서 스팟(persistent/stop), IMDSv2·홉 2, 인바운드 80·443만, CI 역할 신뢰 조건(`vsfirst/restella`의 main만), ECR 태그 덮어쓰기 금지·스캔, 비밀값 복구 기간을 확인. 가용영역의 t4g.large 제공 여부, 스팟 가격, 스팟 vCPU 할당량도 확인 |
+| 2026-10-11 | global apply 승인 | 저장한 plan대로 적용(영역 가져오기 1, OIDC 공급자 생성 1, 태그 변경 1). 다시 plan해 변경 없음 확인. 이어서 demo plan(적용 안 함): 31개 생성, 변경·삭제 없음. plan JSON에서 스팟(persistent/stop), IMDSv2·홉 2, 인바운드 80·443만, CI 역할 신뢰 조건(`vsfirst/restella`의 main만), ECR 태그 덮어쓰기 금지·스캔, 비밀값 복구 기간을 확인. 가용영역의 t4g.large 제공 여부, 스팟 가격, 스팟 vCPU 할당량도 확인 (이 신뢰 조건의 형식이 틀렸음은 첫 CI에서 드러남, [검토 사례 #8](#8-plan이-통과시킨-두-가지-오류-p4)) |
 | 2026-10-11 | demo는 ECR·비밀값·CI 역할만 먼저 적용 (노드 비용을 gitops 준비 뒤로 미루는 AI 권장안 채택) | `-target` plan을 저장해 대상 7개만 들어 있는지 확인 후 적용. AWS에서 ECR 2개(태그 덮어쓰기 금지·스캔·수명 주기 2규칙), 비밀값 그릇(값 없음), CI 역할 신뢰 조건과 권한을 다시 읽어 확인. 남은 demo 리소스는 24개(네트워크·노드) |
 | 2026-10-11 | `restella-demo`에 값 입력을 AI에게 요청. 비용을 아끼려고 비밀값 1개에 `fe`·`be` 키 2개만, 값은 JSON으로 | 스크립트를 앱별 중첩 구조로 바꾸고, 사람 입력이던 데모 운영자 비밀번호도 무작위(20자, 기호 없음)로 만들게 함. 구조가 다르면 덮어쓰지 않고 멈추게 함. 가짜 AWS CLI로 구조, 앱의 환경변수 검증 규칙(길이, 채널 5개), 재실행 시 변경 없음, 빠진 키만 추가, 옛 구조 거부를 확인한 뒤 실제 입력. 확인은 키 이름과 길이까지만 해서 AI 대화 기록에 값이 남지 않게 함. 앱별 키 2개라 Grafana 관리자 비밀번호는 넣지 않음. 보안 문서의 AI 규칙을 "AI는 값을 보지 않는다"로 고침 |
 | 2026-10-11 | 워크플로를 앱별로(`demo-front-end.yaml`, `demo-back-end.yaml`). main에 push·머지되면 빌드 → ECR → gitops 이미지 다이제스트 변경. Grafana도 앱 저장소가 필요한지 질문 | 테스트 → arm64 네이티브 빌드 → ECR 푸시 → gitops 커밋 워크플로 작성. 액션 7개의 최신 릴리스를 조회해 커밋 SHA로 고정하고, 입력·출력 이름은 각 `action.yml`에서 확인. 그 과정에서 `configure-aws-credentials`가 기본값으로 계정 ID를 로그에서 가리지 않는다는 것과, 레지스트리 주소(계정 ID 포함)를 gitops에 커밋하면 공개 저장소에 계정 ID가 실린다는 것을 발견해 막음(가리기 옵션, job 사이에는 다이제스트만, 값 파일에는 레지스트리 주소 제외). 같은 커밋 재실행(ECR 태그 덮어쓰기 금지), 두 워크플로의 동시 커밋, 오래된 실행의 덮어쓰기에 대비. 첫 실행에서 실패하지 않게 두 앱의 lint·typecheck를 로컬에서 먼저 확인. actionlint 1.7.12 통과. 역할 ARN은 값을 출력하지 않고 저장소 Secret으로 등록. Grafana는 자체 이미지가 없어 별도 저장소가 필요 없다고 답함 |
@@ -75,8 +75,12 @@
 | 2026-10-11 | cert-manager 진행 | cert-manager 최신 패치(v1.21.2)와 k3s v1.36.5 내장 Traefik(차트 40.1.0)의 리디렉션 문법을 원문으로 확인. 80번 전체 리디렉션이 HTTP-01을 깨지 않는지 cert-manager 소스(사전 점검이 리디렉션을 따라가고 인증서를 검증하지 않음)로 확인한 뒤 Traefik HelmChartConfig로 구성. 이메일 없는 Let's Encrypt 발급자(실제·staging), cert-manager Application, 메타데이터 차단 목록에 cert-manager 추가. Traefik을 켠 테스트 k3s에서 리디렉션, 자체 서명 대체 발급자로 Ingress → 인증서 → Traefik 응답 흐름, NetworkPolicy 통과, `api.` 경로 공개 범위를 확인. 테스트 중 cert-manager webhook이 CA 주입 전 요청을 거부하는 시간차를 재현해, 기본값으로는 재시도하지 않는 Argo CD 자동 동기화에 재시도(5회)를 모든 Application에 추가. 처음 넣은 재시도 블록의 들여쓰기가 ApplicationSet에서 틀린 것을 YAML 파싱으로 찾아 고침 |
 | 2026-10-11 | 커밋하고 push | 변경 70개를 커밋 전 검사(계정 ID·도메인·상위 도메인을 AWS·tfvars의 실제 값과 대조, 이메일, 공인 IP, 제외 파일)한 뒤 infra·ci·gitops·docs 4개 커밋으로 나눠 push. 첫 CI는 테스트는 통과했지만 빌드에서 AWS 역할을 맡지 못해 실패 |
 | 2026-10-11 | 노드 적용 | plan을 저장해 24개 생성만 있는지 확인 후 적용. 보안 그룹 규칙 1개가 실패: 설명에 한글과 `'`가 있었는데 AWS는 영문·일부 기호만 받고, validate·plan은 이를 검사하지 않음. 설명을 영문으로 바꾸고 같은 실수가 plan에서 걸리도록 모듈 변수에 형식 검사를 추가(옛 설명은 거부, 새 설명은 통과 확인). SSM으로 노드를 확인: k3s v1.36.5 Ready, 데이터 볼륨 마운트, 로그 상한 적용 |
-| 2026-10-11 | (CI 실패 원인 조사) | 역할 신뢰 조건은 `repo:vsfirst/restella:...`였지만, 이 저장소의 OIDC 토큰은 소유자·저장소 ID가 붙는 "변경 불가 subject" 형식임을 GitHub API로 확인. 변수를 `github_oidc_subject_prefix`로 바꿔 ID 형식으로 맞추고(이름 재사용 공격도 막힘) 적용 후 실패한 job만 재실행. ADR-0003에 기록 |
-| 2026-10-11 | 부트스트랩 진행 | 스크립트가 55초 만에 Argo CD 설치 → 클러스터 Secret → 루트 Application 등록까지 마침. 그런데 7분간 하위 앱이 생기지 않아 SSM으로 확인하니 루트는 `argocd-bootstrap`(wave -2)을, `argocd-bootstrap`은 자기가 관리하는 루트를 기다리는 순환 대기. 로컬 테스트 때는 GitHub의 `apps/demo`가 비어 있어 드러나지 않았던 문제. `argocd-bootstrap`은 `argocd.yaml`만 관리하고 루트는 스크립트만 적용하도록 바꾸고 ADR-0005에 기록 |
+| 2026-10-11 | (CI 실패 원인 조사) | 역할 신뢰 조건은 `repo:vsfirst/restella:...`였지만, 이 저장소의 OIDC 토큰은 소유자·저장소 ID가 붙는 "변경 불가 subject" 형식임을 GitHub API로 확인. 변수를 `github_oidc_subject_prefix`로 바꿔 ID 형식으로 맞추고(이름 재사용 공격도 막힘) 적용 후 실패한 job만 재실행. ADR-0003에 기록. 재실행한 두 워크플로가 ECR 푸시와 gitops 다이제스트 커밋까지 성공 ([검토 사례 #8](#8-plan이-통과시킨-두-가지-오류-p4)) |
+| 2026-10-11 | 부트스트랩 진행 | 스크립트가 55초 만에 Argo CD 설치 → 클러스터 Secret → 루트 Application 등록까지 마침. 그런데 7분간 하위 앱이 생기지 않아 SSM으로 확인하니 루트는 `argocd-bootstrap`(wave -2)을, `argocd-bootstrap`은 자기가 관리하는 루트를 기다리는 순환 대기. 로컬 테스트 때는 GitHub의 `apps/demo`가 비어 있어 드러나지 않았던 문제. `argocd-bootstrap`은 `argocd.yaml`만 관리하고 루트는 스크립트만 적용하도록 바꾸고 ADR-0005에 기록 ([검토 사례 #7](#7-잘못된-이유로-통과한-부트스트랩-테스트-p4)) |
+| 2026-10-11 | (멈춘 클러스터 복구) | Git 수정만으로는 이미 멈춘 클러스터가 풀리지 않음을 확인: 새 `argocd-bootstrap` 정의를 반영하는 루트의 동기화가 바로 그 앱을 기다리며 멈춰 있었다. SSM으로 노드에서 새 정의를 직접 적용하고 `root-demo`에 남은 `argocd.argoproj.io/tracking-id` annotation을 지움. 옛 정의로 진행 중이던 동기화가 annotation을 다시 붙여 한 번 더 지운 뒤, 하위 앱이 wave 순서대로 생성됨 |
+| 2026-10-11 | 상태 확인 (긴 대기 루프는 "너무 오래 걸린다"며 중단) | `cluster-config` 첫 동기화가 ESO webhook에 엔드포인트가 아직 없어 실패했지만, 앞서 넣은 재시도(5회)로 사람 개입 없이 회복. 최종 상태: 모든 Application Synced/Healthy, ClusterSecretStore Valid(노드 역할로 Secrets Manager 접근), ECR pull Secret 동기화, Let's Encrypt 실제 인증서 발급, HTTP 301. 이후 확인은 짧게 한 번씩만 하기로 바꿈. Argo CD 화면은 Ingress로 열지 않고 SSM 포트 포워딩, DB는 SSM + `kubectl exec`/`port-forward`로 접속하는 방법 안내(비밀번호는 사람이 직접 읽음) |
+| 2026-10-11 | 면접관이 demo를 직접 써 볼 수 있도록 루트에 사용 방법을 상세히. 계정·비밀번호는 사람이 따로 전달 | 화면 이름·버튼·기본값을 UI 코드와 E2E에서 확인해 [DEMO.md](../DEMO.md) 작성: 5분 시연 순서와 기대 결과, 추가 실험, API 문서와 401이 정상인 이유, 공용 환경·로그인 제한(모든 사용자가 1분 5회 공유)·스팟 회수 같은 제약. 도메인은 Git에 두지 않는 결정에 따라 `fe.<도메인>`으로 쓰고 따로 전달 |
+| 2026-10-11 | 모든 기록(.md)이 제대로 작성됐는지 확인하고 수정 | 문서를 세 묶음으로 나눠 하위 에이전트 3개가 코드·설정·배포 상태와 대조(읽기 전용). 깨진 링크는 없었고, 배포 이후 상태 미반영("적용 전", "배포하면서 추가"), 미구현을 구현처럼 쓴 곳(Prometheus·Grafana, prod 코드), 코드와 다른 사실(이벤트 API 쿼리, `simulation_run` 컬럼, 마이그레이션 훅 종류, "채널 API 키")을 찾음. 주요 주장은 코드로 다시 확인한 뒤 README·기획·설계·개발·테스트 문서, ADR-0001~0003·0005, infra README에 반영. 추적표에서 AC-N03-1·N03-2·N06-1을 ✅로 바꾸고 나머지는 ⏳ 유지. 검토 사례 #7·#8 추가 |
 
 ## 검토 사례
 
@@ -129,3 +133,19 @@ AI는 Next.js 16.4가 학습한 내용과 다를 수 있다고 보고, 코드를
 - **"통과했지만 틀린" 테스트:** 스크린샷을 직접 열어 보다가 채널별 재고 화면이 로딩 상태로 찍힌 것을 발견했다. 테스트가 아직 화면에 드러나지 않은 요소까지 세고 있었다. 보이는 요소만 세도록 고쳤다.
 
 자세한 내용은 [테스트 결과 보고서](4-testing/test-report.md)의 F1~F5에 있다.
+
+### #7 잘못된 이유로 통과한 부트스트랩 테스트 (P4)
+
+로컬 k3s에서 부트스트랩을 검증할 때 루트 Application은 GitHub에서 정상으로 동기화됐다. 그런데 demo 첫 배포에서는 스크립트가 55초 만에 끝난 뒤 7분 동안 하위 앱이 하나도 생기지 않았다.
+- **원인:** 처음에는 `argocd-bootstrap`(wave -2)이 Argo CD 설치 정의와 함께 루트(`root.yaml`)도 관리했다. 루트는 `argocd-bootstrap`이 Healthy가 되기를, `argocd-bootstrap`은 자기가 관리하는 루트가 Healthy가 되기를 기다렸다.
+- **왜 로컬에서 통과했나:** 테스트할 때 GitHub의 `apps/demo`는 아직 비어 있었다(gitops 파일을 push하기 전). 하위 앱이 없으니 루트가 기다릴 wave도 없어 바로 Healthy가 됐다. 테스트는 통과했지만, 검증하려던 "wave 순서대로 하위 앱이 뜬다"는 한 번도 실행되지 않았다.
+- **조치:** `argocd-bootstrap`은 `argocd.yaml`만 관리하게 하고(`directory.include`), 루트는 부트스트랩 스크립트만 적용하게 했다. 이유를 두 파일의 주석과 [ADR-0005](adr/0005-cluster-bootstrap.md)에 남겼다.
+- **클러스터 복구:** Git만 고쳐서는 이미 멈춘 클러스터가 풀리지 않았다. 새 정의를 반영하는 루트의 동기화가 바로 그 앱을 기다리며 멈춰 있었기 때문이다. 노드에서 새 `argocd-bootstrap` 정의를 직접 적용하고 `root-demo`에 남은 `argocd.argoproj.io/tracking-id` annotation을 지웠다. 진행 중이던 동기화가 annotation을 다시 붙여 한 번 더 지웠다.
+- **교훈:** 테스트가 통과하면 "검증하려던 경로를 실제로 지났는가"까지 확인한다. 입력이 비어 있어서 통과한 테스트는 검증이 아니다.
+
+### #8 plan이 통과시킨 두 가지 오류 (P4)
+
+노드를 적용하기 전에 plan JSON을 읽어 보안 그룹과 CI 역할 신뢰 조건이 의도대로인지 확인했다. 그래도 실제 적용과 첫 CI에서 오류 2건이 나왔다.
+- **보안 그룹 규칙 설명:** 설명에 한글과 `'`를 썼다. AWS는 영문과 일부 기호만 받는데, `terraform validate`와 plan은 이를 검사하지 않아 apply에서야 실패했다. 설명을 영문으로 바꾸고, 같은 실수가 plan에서 걸리도록 `k3s-node` 모듈 변수에 형식 검사를 넣었다(옛 설명은 거부, 새 설명은 통과 확인).
+- **CI 역할 신뢰 조건:** plan에서 "이 저장소의 main만"인 것을 확인했지만, 기준으로 삼은 `repo:<소유자>/<저장소>` 형식 자체가 틀렸다. 이 저장소의 OIDC 토큰 `sub`는 소유자·저장소 ID가 붙는 "변경 불가 subject" 형식이었다. GitHub API로 실제 형식을 읽어 변수를 `github_oidc_subject_prefix`로 바꿨다. 이름이 아닌 ID로 고르므로 같은 이름으로 다시 만든 저장소가 역할을 맡는 것도 막혔다([ADR-0003](adr/0003-delivery-pipeline.md)).
+- **교훈:** plan은 "코드가 뜻한 대로 바뀌는가"만 보여준다. 외부 시스템이 그 값을 받아들이는지는 그 시스템의 실제 규칙과 값으로 확인한다.

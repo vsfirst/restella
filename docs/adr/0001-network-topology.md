@@ -20,7 +20,7 @@
 | D | 프라이빗(EC2) + VPC 엔드포인트만, NAT 없음 | 인터페이스 엔드포인트 5~6개 × 약 $7~10 | 기각. GitHub와 GHCR는 엔드포인트로 접근할 수 없어 GitOps 흐름이 깨진다. 비용도 NAT Gateway와 비슷하거나 더 비싸다 |
 | E | CloudFront VPC Origin + 프라이빗 EC2 + ACM | 사용량 기준(소량) | 보류. 충돌 알림용 SSE 연결이 CloudFront 원본 응답 타임아웃에 걸릴 수 있어 검증이 필요하다 |
 
-비용은 다른 리전의 공시 가격을 바탕으로 한 대략치다. 서울 리전 가격은 적용 전에 AWS 계산기로 확인한다.
+비용은 다른 리전의 공시 가격을 바탕으로 한 대략치다. 서울 리전 가격으로 표 전체를 다시 계산하지는 않았다. demo 인스턴스와 스팟 가격만 AWS Pricing API로 확인했다([ADR-0002](0002-demo-node-os-and-instance.md)).
 
 ## 결정
 
@@ -49,9 +49,11 @@ prod는 **비용 문제로 실제 AWS에 반영하지 않고 소스 코드로만
 
 ## 결과
 
+> 2026-10-11 현재 demo만 작성·적용했다. prod 코드(`envs/prod`, `modules/alb`, gitops의 prod)는 아직 작성하지 않았고 디렉토리만 있다. `k3s-node` 모듈도 아직 노드 1대만 만든다.
+
 > 이후 이미지 저장소는 GHCR에서 ECR로 바뀌었다([ADR-0003](0003-delivery-pipeline.md)). Argo CD의 GitHub 의존은 그대로라서 안 D를 기각한 결론은 같다.
 
-- Terraform은 `envs/demo`, `envs/prod` 두 환경으로 나눈다. 모듈(`network`, `k3s-node`, `alb`)은 두 환경이 함께 쓴다. network 모듈은 "퍼블릭만" 구성과 "퍼블릭 + 프라이빗 + NAT" 구성을 모두 지원한다.
+- Terraform은 `envs/demo`, `envs/prod` 두 환경으로 나눈다. 모듈 `network`, `k3s-node`는 두 환경이 함께 쓰고, `alb`는 prod만 쓴다. network 모듈은 "퍼블릭만" 구성과 "퍼블릭 + 프라이빗 + NAT" 구성을 모두 지원한다.
 - prod는 `terraform apply`를 하지 않는다. 대신 `terraform validate`와 tflint로 코드가 유효한지 검증한다.
 - GitOps도 환경별로 나눈다(`infra/gitops/apps/{demo,prod}`, `infra/gitops/values/{demo,prod}`).
   - cert-manager는 demo에만 배포한다.

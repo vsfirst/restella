@@ -67,7 +67,7 @@ front-end/
 |---|---|
 | `_app` | 프로바이더(TanStack Query, 실시간 갱신), 전역 스타일, 레이아웃, BFF 로직 |
 | `_pages` | 화면 단위 조합. 서버에서 화면 데이터를 받아 위젯에 props로 넘긴다 |
-| `widgets` | 독립적인 큰 UI 블록과 그 안의 사용자 행동: 콘솔 상단(로그아웃), 재고 달력(총 재고 조정), 예약 표(예약 취소), 충돌 처리함(옮기기·해결됨·취소), 이벤트 표, 시뮬레이터(실행), 채널별 재고(장애 주입) |
+| `widgets` | 독립적인 큰 UI 블록과 그 안의 사용자 행동: 콘솔 상단(로그아웃), 재고 달력(총 재고 조정), 예약 표(예약 취소), 충돌 처리함(옮기기·해결됨·취소), 충돌 알림 토스트, 이벤트 표, 시뮬레이터(실행), 채널별 재고(장애 주입) |
 | `shared` | 여러 레이어가 함께 쓰는 코드: API 경로·fetch(브라우저용·서버용)·타입·세션, 설정, 날짜와 도메인 표시 로직(라벨, 이벤트 문장, 재고 판정), 기본 UI와 도메인 배지 |
 
 **`entities` 레이어는 두지 않는다.** 처음에는 엔티티 7개를 두었지만, API 경로를 `shared/api/endpoints.ts`로 모으고 화면 데이터를 서버가 props로 넘기게 바꾸자 엔티티 대부분이 한 줄짜리 요청 함수와 타입 별칭이 됐다. 실제 도메인 코드는 여러 위젯이 함께 쓰는 배지·문장 변환·재고 판정 몇 개뿐이라, 이것을 `shared`로 옮기고 레이어를 없앴다. 그래서 이 저장소의 `shared`는 도메인을 안다. FSD도 `entities`와 `features`는 필요할 때만 두는 선택 레이어로 본다.
@@ -101,7 +101,7 @@ iron-session 설정은 `_app`이 아니라 `shared/api`(서버 전용)에 둔다
 
 - **API는 브라우저용과 서버용으로 나눈다.** 둘 다 fetch만 쓴다.
   - `shared/api/server.ts`의 `serverFetch`: 서버 → back-end. 세션의 토큰을 붙인다(서버 전용). `_pages`가 부른다.
-  - `shared/api/client.ts`의 `clientFetch`: 브라우저 → BFF(`/api/bff`). 토큰은 BFF가 붙인다. 기능의 컨트롤러가 부른다.
+  - `shared/api/client.ts`의 `clientFetch`: 브라우저 → BFF(`/api/bff`). 토큰은 BFF가 붙인다. 위젯의 컨트롤러가 부른다.
   - 경로는 [`shared/api/endpoints.ts`](src/shared/api/endpoints.ts) 한 파일에서 관리한다. 엔드포인트마다 메서드, 경로, 요청·응답 타입을 함께 둔다. 경로를 추가·변경하면 이 파일과 [API 목록](../docs/3-development/api-reference.md)을 함께 고친다.
 
     ```ts

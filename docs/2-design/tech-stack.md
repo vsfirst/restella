@@ -33,8 +33,8 @@
 | 테스트 | front-end: Vitest / Vite | 5.0.3 / 8.3.4 | 최신 |
 | | back-end: Vitest | 5.0.3 | 최신. NestJS 12 CLI가 만든 템플릿의 테스트 도구다. 템플릿은 4를 쓰지만 5로 올렸다 |
 | | E2E: Playwright | 1.64.0 | 최신. 로컬에 설치된 Chrome으로 실행한다 |
+| | 통합 테스트 DB: Testcontainers (MariaDB 모듈) | 12.2.0 | 최신 |
 | API 타입 생성 | @hey-api/openapi-ts | 0.99.0 | 호환. 후보였던 openapi-typescript 7.13은 TypeScript 5만 지원한다 |
-| | Testcontainers (MariaDB 모듈) | 12.2.0 | 최신 |
 | back-end 라이브러리 | @nestjs/jwt, @nestjs/schedule, @nestjs/terminus, @nestjs/config / @nestjs/throttler | 12.0.2, 12.0.2, 12.1.0, 12.0.1 / 6.7.1 | 최신 |
 | | argon2 / prom-client / class-validator / class-transformer | 0.45.1 / 15.1.3 / 0.15.1 / 0.5.1 | 최신 |
 | | @types/node | 24.19.1 | 호환. 최신은 26이지만 런타임 Node 24 LTS에 맞춘다 |
@@ -44,11 +44,13 @@
 | 클러스터 | k3s | v1.36.5+k3s1 | 호환 |
 | 배포 | Argo CD (Helm 차트) | 3.5.4 (argo-cd 10.10.2) | 최신. 같은 앱 버전의 최신 차트 패치 |
 | | Helm CLI | 4.2.1 | 호환 |
+| Ingress | Traefik (k3s 내장) | 3.7.13 (traefik 차트 40.1.0) | 호환. k3s v1.36.5에 포함된 버전. HTTP는 HTTPS로 리디렉션 |
+| 비밀값 전달 | External Secrets Operator | 2.12.0 (차트 2.12.0) | 최신 |
 | TLS | demo: cert-manager + Let's Encrypt | v1.21.2 | 최신 (Kubernetes 1.33~1.36 지원) |
-| | prod: ALB + ACM | AWS 관리형 | |
-| 관측 | kube-prometheus-stack | 92.2.0 | 최신 |
-| | Prometheus | 3.13.4 | LTS (2027-07 지원 종료) |
-| | Grafana | 13.2.3 (grafana 차트 13.4.0) | 최신 (차트 기본값) |
+| | prod: ALB + ACM | AWS 관리형 | 설계만. 코드는 아직 작성하지 않았다 |
+| 관측 | kube-prometheus-stack | 92.2.0 | **미구현.** 버전만 정했고 배포하지 않았다 |
+| | Prometheus | 3.13.4 | **미구현.** LTS (2027-07 지원 종료) |
+| | Grafana | 13.2.3 (grafana 차트 13.4.0) | **미구현.** 최신 (차트 기본값) |
 | 보안 | gitleaks (커밋 전 비밀값 검사) | 8.30.1 | 최신 |
 | CI / 이미지 저장소 | GitHub Actions / Amazon ECR | — | 사람 결정 ([ADR-0003](../adr/0003-delivery-pipeline.md)) |
 | | GitHub Actions 러너 | ubuntu-24.04, ubuntu-24.04-arm | 이미지는 arm64 러너에서 네이티브 빌드 |
@@ -58,7 +60,7 @@
 | | docker/setup-buildx-action · build-push-action | v4.4.1 · v7.4.0 | 최신 |
 | 비밀값 | AWS Secrets Manager + External Secrets Operator | ESO 2.12 (helm-chart-2.12.0) | 최신 (Kubernetes 1.36 지원) |
 | AWS | demo: 퍼블릭 EC2 1대 + EIP | t4g.large 스팟 (`use_spot`으로 온디맨드 전환) | 비용 ([ADR-0002](../adr/0002-demo-node-os-and-instance.md)) |
-| | prod: ALB + NAT Gateway + 프라이빗 EC2 (코드만, 배포 안 함) | | |
+| | prod: ALB + NAT Gateway + 프라이빗 EC2 (설계만. 코드는 아직 작성하지 않았다) | | |
 
 ## 최신 버전을 쓰지 않은 항목
 
@@ -70,7 +72,7 @@
 | k3s | v1.37.1 | v1.36.5 | 호환 우선. Argo CD 3.5가 테스트한 Kubernetes는 v1.33~v1.36이고, k3s stable 채널도 v1.36.5다 |
 | Helm CLI | 4.3.0 | 4.2.1 | 호환 우선. Argo CD 3.5.4에 내장된 Helm이 4.2.1이라, 로컬 `helm template` 결과를 Argo CD 렌더링 결과와 맞춘다 |
 | openapi-typescript | 7.13.0 | 쓰지 않음 (@hey-api/openapi-ts 0.99.0) | 호환 우선. peerDependencies가 `typescript ^5.x`라 TypeScript 6과 맞지 않는다 |
-| Prometheus | 3.15.0 (차트 기본값 3.14.0) | 3.13.4 | LTS 우선. prometheus-operator 0.94.1의 호환 목록에 3.13 라인이 들어 있다. 차트 values에서 이미지 태그를 고정한다 |
+| Prometheus | 3.15.0 (차트 기본값 3.14.0) | 3.13.4 | LTS 우선. prometheus-operator 0.94.1의 호환 목록에 3.13 라인이 들어 있다. (관측 스택은 아직 배포하지 않았다) |
 
 ## 재검토 일정
 
