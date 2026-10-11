@@ -17,5 +17,7 @@ resource "aws_route53_zone" "this" {
   lifecycle {
     # 영역을 지우면 네임서버가 바뀌어 위임이 끊긴다. 환경을 정리할 때도 영역은 남긴다
     prevent_destroy = true
+    # 가져온 영역의 기존 설명(위임 출처 등 운영 메모)을 덮어쓰지 않는다. 실제 도메인을 코드에 적지 않기 위해서이기도 하다
+    ignore_changes = [comment]
   }
 }
