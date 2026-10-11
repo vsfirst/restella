@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # demo 클러스터에 Argo CD를 처음 한 번 설치하고 루트 Application을 등록한다 (docs/adr/0005-cluster-bootstrap.md).
-# 그 뒤의 변경은 모두 Git으로 한다. Argo CD가 자기 설치 정의(bootstrap/demo)까지 Git과 맞춘다.
+# 그 뒤의 변경은 모두 Git으로 한다. Argo CD가 자기 설치 정의(bootstrap/demo/argocd.yaml)까지 Git과 맞춘다.
+# 루트 Application(root.yaml)은 이 스크립트만 적용한다 (docs/adr/0005-cluster-bootstrap.md 결정 1).
 #
 # - Kubernetes API는 밖에 열지 않았다. SSM Run Command로 노드에서 k3s kubectl을 실행한다
 # - 노드는 공개 저장소의 main 브랜치에서 bootstrap/demo의 파일을 받아 적용한다. 먼저 main에 push돼 있어야 한다

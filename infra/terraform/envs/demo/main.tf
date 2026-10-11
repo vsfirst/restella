@@ -50,7 +50,7 @@ module "k3s_node" {
 }
 
 # DNS: 호스팅 영역 이름과 그 하위 이름 전체(*.)를 노드의 고정 IP로 보낸다
-# (서비스, Argo CD, Grafana 등을 하위 이름으로 나눠 Traefik이 받는다)
+# (콘솔 fe., API api. 등을 하위 이름으로 나눠 Traefik이 받는다)
 # 영역은 global 스택이 만들고 지킨다. demo는 이름으로 찾아 자기 레코드만 관리한다 (global을 먼저 적용)
 
 data "aws_route53_zone" "this" {
