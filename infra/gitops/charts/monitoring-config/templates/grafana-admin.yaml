@@ -1,0 +1,36 @@
+# Grafana 관리자 비밀번호 생성기. 영문·숫자만 쓴다
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: grafana-admin
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1" # Grafana보다 먼저
+spec:
+  length: {{ .Values.grafanaAdmin.passwordLength }}
+  digits: 6
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+---
+# 처음 한 번만 만든다(CreatedOnce). 다시 동기화해도 비밀번호가 바뀌지 않는다
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ .Values.grafanaAdmin.secretName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  refreshPolicy: CreatedOnce
+  target:
+    name: {{ .Values.grafanaAdmin.secretName }}
+    creationPolicy: Owner
+    template:
+      data:
+        admin-user: {{ .Values.grafanaAdmin.user | quote }}
+        admin-password: {{ `"{{ .password }}"` }}
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: grafana-admin

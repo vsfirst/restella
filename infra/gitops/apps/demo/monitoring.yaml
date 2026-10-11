@@ -1,0 +1,61 @@
+# demo 모니터링: kube-prometheus-stack(Prometheus, Grafana) + Restella 설정(monitoring-config).
+# Grafana 주소(grafana.<도메인>)를 클러스터 Secret annotation에서 받으려고 ApplicationSet으로 만든다 (ADR-0005 결정 4)
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: monitoring
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1" # back-end(2)의 ServiceMonitor보다 먼저 CRD를 만든다
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            restella.io/environment: demo
+  template:
+    metadata:
+      name: monitoring
+    spec:
+      project: default
+      sources:
+        - repoURL: https://prometheus-community.github.io/helm-charts
+          chart: kube-prometheus-stack
+          targetRevision: 92.3.0
+          helm:
+            releaseName: monitoring
+            valueFiles:
+              - $values/infra/gitops/values/demo/monitoring.yaml
+            parameters:
+              - name: grafana.ingress.hosts[0]
+                value: 'grafana.{{ index .metadata.annotations "restella.io/domain" }}'
+              - name: grafana.ingress.tls[0].hosts[0]
+                value: 'grafana.{{ index .metadata.annotations "restella.io/domain" }}'
+              - name: grafana.env.GF_SERVER_ROOT_URL
+                value: 'https://grafana.{{ index .metadata.annotations "restella.io/domain" }}/'
+        - repoURL: https://github.com/vsfirst/restella.git
+          targetRevision: main
+          ref: values
+        - repoURL: https://github.com/vsfirst/restella.git
+          targetRevision: main
+          path: infra/gitops/charts/monitoring-config
+          helm:
+            releaseName: monitoring-config
+      destination:
+        server: '{{ .server }}'
+        namespace: monitoring
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true # Prometheus CRD가 커서 클라이언트 적용의 어노테이션 크기 제한을 넘는다
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

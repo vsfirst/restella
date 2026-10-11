@@ -1,0 +1,5 @@
+apiVersion: v2
+name: monitoring-config
+description: kube-prometheus-stack에 더하는 Restella 설정. Grafana 관리자 비밀번호(ESO 생성기)와 Restella 대시보드
+type: application
+version: 0.1.0

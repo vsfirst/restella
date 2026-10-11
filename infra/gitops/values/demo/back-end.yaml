@@ -10,3 +10,8 @@ ingress:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt # cert-manager를 구성하면 인증서를 발급한다
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
+
+# Prometheus 수집 (apps/demo/monitoring.yaml)
+monitoring:
+  serviceMonitor:
+    enabled: true

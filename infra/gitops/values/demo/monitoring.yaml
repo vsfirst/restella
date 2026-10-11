@@ -1,0 +1,81 @@
+# demo 모니터링 (kube-prometheus-stack 92.3.0). Prometheus가 back-end /metrics와 클러스터 지표를 모으고 Grafana로 본다.
+# grafana.ingress의 호스트(grafana.<도메인>)와 root_url은 ApplicationSet이 클러스터 Secret annotation에서 넣는다
+
+# Alertmanager는 받을 곳(메일·슬랙)이 없어 끈다
+alertmanager:
+  enabled: false
+
+# k3s는 컨트롤러 매니저·스케줄러·kube-proxy·etcd를 한 프로세스에 넣어 따로 수집할 수 없다
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeEtcd:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    image:
+      tag: v3.13.4-distroless # LTS (docs/2-design/tech-stack.md). 차트 기본값은 3.15
+    # 다른 네임스페이스의 ServiceMonitor(back-end 등)도 레이블 조건 없이 읽는다
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    # 데이터 EBS(10GiB)를 MariaDB와 나눠 쓴다
+    retention: 7d
+    retentionSize: 3GB
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+    resources:
+      requests: { cpu: 100m, memory: 512Mi }
+      limits: { memory: 1Gi }
+
+prometheusOperator:
+  resources:
+    requests: { cpu: 20m, memory: 64Mi }
+    limits: { memory: 256Mi }
+
+grafana:
+  defaultDashboardsTimezone: Asia/Seoul
+  # 관리자 비밀번호는 monitoring-config 차트가 ESO 생성기로 한 번 만든다 (기본값 prom-operator를 쓰지 않는다)
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  # 대시보드는 ConfigMap(코드)으로 관리한다. 화면에서 바꾼 내용은 저장하지 않는다
+  persistence:
+    enabled: false
+  grafana.ini:
+    # 면접관이 로그인 없이 대시보드를 볼 수 있게 한다(사람 결정). 편집·Explore는 관리자만
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer
+    users:
+      allow_sign_up: false
+      viewers_can_edit: false
+    analytics:
+      reporting_enabled: false
+      check_for_updates: false
+    security:
+      cookie_secure: true
+      disable_gravatar: true
+    dashboards:
+      default_home_dashboard_path: /tmp/dashboards/restella-overview.json
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    tls:
+      - secretName: grafana-tls
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 384Mi }

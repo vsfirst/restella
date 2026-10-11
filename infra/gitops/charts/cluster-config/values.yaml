@@ -28,6 +28,7 @@ blockInstanceMetadata:
     - name: argocd
     - name: kube-system
     - name: cert-manager # HTTP-01만 쓰므로 AWS 권한이 필요 없다
+    - name: monitoring
 
 ingressClassName: traefik # k3s 기본 Ingress 컨트롤러
 

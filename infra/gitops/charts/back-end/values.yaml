@@ -85,3 +85,14 @@ networkPolicy:
     namespace: kube-system
     podLabels:
       app.kubernetes.io/name: traefik
+  # /metrics를 수집하는 Prometheus (monitoring.serviceMonitor.enabled일 때만 연다)
+  metricsScraper:
+    namespace: monitoring
+    podLabels:
+      app.kubernetes.io/name: prometheus
+
+# Prometheus가 /metrics를 30초마다 수집한다 (kube-prometheus-stack의 ServiceMonitor CRD가 있어야 한다)
+monitoring:
+  serviceMonitor:
+    enabled: false
+    interval: 30s
