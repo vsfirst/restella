@@ -1,0 +1,14 @@
+# demo front-end (charts/front-end/values.yaml을 덮어쓴다)
+# image.registry, ingress.host(fe.<도메인>)는 ApplicationSet이 클러스터 Secret의 annotation에서 넣는다 (apps/demo/front-end.yaml)
+
+appEnv: demo
+
+secret:
+  externalSecret:
+    enabled: true # Secrets Manager restella-demo의 fe 객체
+
+ingress:
+  enabled: true
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt # cert-manager를 구성하면 인증서를 발급한다
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure

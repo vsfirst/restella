@@ -1,0 +1,42 @@
+# 환경별 값은 infra/gitops/values/<환경>/cluster-config.yaml에서 덮어쓴다
+
+region: ap-northeast-2
+
+# 앱 네임스페이스. 여러 Application이 함께 쓰므로 여기서 만든다
+namespaces:
+  - restella
+
+# 모든 ExternalSecret이 쓰는 AWS Secrets Manager 연결. 인증을 비우면 ESO Pod의 AWS 기본 자격 증명(노드 역할)을 쓴다
+clusterSecretStore:
+  name: aws-secrets-manager
+
+# 비공개 ECR 이미지를 받을 pull Secret. ESO가 12시간짜리 토큰을 받아 주기적으로 갱신한다
+ecrPullSecret:
+  name: ecr-pull
+  refreshInterval: 6h # 토큰 유효 기간(12시간)의 절반
+  namespaces:
+    - restella
+
+# 인스턴스 메타데이터(노드 IAM 역할 자격 증명)를 막는다. ESO만 노드 역할을 써야 하는데 IMDS 홉 제한을 2로 올렸기 때문이다.
+# NetworkPolicy는 네임스페이스 단위라, 네임스페이스마다 둔다. external-secrets 네임스페이스는 넣지 않는다
+blockInstanceMetadata:
+  cidr: 169.254.169.254/32
+  namespaces:
+    - name: restella
+      # 이 Pod들은 더 엄격한 자체 정책(나가는 트래픽 전부 차단)이 있다. 여기서 고르면 허용 규칙이 더해져 오히려 느슨해진다
+      excludeApps: [mariadb]
+    - name: argocd
+    - name: kube-system
+    - name: cert-manager # HTTP-01만 쓰므로 AWS 권한이 필요 없다
+
+ingressClassName: traefik # k3s 기본 Ingress 컨트롤러
+
+# Let's Encrypt 발급자. 앱 Ingress는 letsencrypt를 쓴다. 발급을 시험할 때는 발급 횟수 제한이 넉넉한 staging을 쓴다
+certIssuers:
+  - name: letsencrypt
+    server: https://acme-v02.api.letsencrypt.org/directory
+  - name: letsencrypt-staging
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+
+traefik:
+  redirectToHttps: true

@@ -1,0 +1,17 @@
+# demo 환경의 MariaDB (charts/mariadb/values.yaml을 덮어쓴다)
+
+# 비밀번호는 Secrets Manager restella-demo의 be.DB_PASSWORD (infra/README.md "비밀값 키")
+externalSecret:
+  enabled: true
+
+# 데이터 EBS(10GiB)를 Prometheus 등과 나눠 쓴다. 데모 데이터는 수 MB라 2GiB로 충분하다
+persistence:
+  size: 2Gi
+
+# t4g.large(8GiB) 한 대에 k3s, Argo CD, 모니터링, 앱이 함께 돈다
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi

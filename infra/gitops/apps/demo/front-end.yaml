@@ -1,0 +1,53 @@
+# demo front-end (운영자 콘솔). Git에 둘 수 없는 값(ECR 레지스트리 주소, 도메인)을 클러스터 Secret의 annotation에서 받으려고
+# Application 대신 ApplicationSet(클러스터 생성기)으로 만든다. 클러스터 Secret은 부트스트랩 스크립트가 만든다
+# (docs/adr/0005-cluster-bootstrap.md 결정 4)
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: front-end
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3" # back-end(2) 다음. ApplicationSet은 생성한 앱의 상태를 기다리지 않지만, 콘솔은 back-end가 늦게 떠도 요청 때 다시 부른다
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"] # annotation이 없으면 Application을 만들지 않는다
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            restella.io/environment: demo
+  template:
+    metadata:
+      name: front-end
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/vsfirst/restella.git
+        targetRevision: main
+        path: infra/gitops/charts/front-end
+        helm:
+          releaseName: front-end
+          # CI가 아직 이미지를 올리지 않았으면 front-end-image.yaml이 없다. 그때는 차트가 "image.digest가 필요하다"로 멈춘다
+          ignoreMissingValueFiles: true
+          valueFiles:
+            - ../../values/demo/front-end.yaml
+            - ../../values/demo/front-end-image.yaml # CI가 쓰는 이미지 다이제스트
+          parameters:
+            - name: image.registry
+              value: '{{ index .metadata.annotations "restella.io/ecr-registry" }}'
+            - name: ingress.host
+              value: 'fe.{{ index .metadata.annotations "restella.io/domain" }}'
+      destination:
+        server: '{{ .server }}'
+        namespace: restella
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        # 앞 단계가 막 떠서 일시적으로 실패할 수 있다(예: cert-manager·ESO webhook의 CA 주입 전). 기본값은 재시도하지 않는다
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

@@ -1,0 +1,32 @@
+# 클러스터 공통 설정: 네임스페이스, Secrets Manager 연결, ECR pull Secret, 인스턴스 메타데이터 차단, Let's Encrypt 발급자, Traefik HTTPS 리디렉션
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-config
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0" # ESO·cert-manager(-1)의 CRD가 생긴 뒤
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/vsfirst/restella.git
+    targetRevision: main
+    path: infra/gitops/charts/cluster-config
+    helm:
+      releaseName: cluster-config
+      valueFiles:
+        - ../../values/demo/cluster-config.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    # 앞 단계가 막 떠서 일시적으로 실패할 수 있다(예: cert-manager·ESO webhook의 CA 주입 전). 기본값은 재시도하지 않는다
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

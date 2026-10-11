@@ -1,0 +1,27 @@
+# demo 루트 Application (App of Apps). apps/demo의 Application들을 만든다.
+# 하위 Application은 sync wave 순서로 뜬다: -2 Argo CD 자신 → -1 ESO → 0 클러스터 공통 설정 → 1 DB → 2 back-end → 3 front-end
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root-demo
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/vsfirst/restella.git
+    targetRevision: main
+    path: infra/gitops/apps/demo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true # apps/demo에서 파일을 지우면 그 Application도 지운다 (하위 리소스는 finalizer가 없어 남는다)
+      selfHeal: true
+    # 앞 단계가 막 떠서 일시적으로 실패할 수 있다(예: cert-manager·ESO webhook의 CA 주입 전). 기본값은 재시도하지 않는다
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

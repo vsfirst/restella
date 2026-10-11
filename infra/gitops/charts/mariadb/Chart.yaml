@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mariadb
+description: Restella의 MariaDB. 공식 이미지를 그대로 쓰는 단일 인스턴스 StatefulSet (스키마는 back-end 마이그레이션 Job이 만든다)
+type: application
+version: 0.1.0
+appVersion: "12.3.3"

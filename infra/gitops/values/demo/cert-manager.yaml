@@ -1,0 +1,21 @@
+# demo cert-manager (차트 jetstack/cert-manager v1.21.2)
+crds:
+  enabled: true
+  keep: true # 차트를 지워도 Certificate 정의(CRD)와 발급된 인증서는 남긴다
+
+resources:
+  requests: { cpu: 10m, memory: 64Mi }
+  limits: { memory: 256Mi }
+webhook:
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits: { memory: 128Mi }
+cainjector:
+  resources:
+    requests: { cpu: 10m, memory: 64Mi }
+    limits: { memory: 256Mi }
+
+# Prometheus를 구성한 뒤 켠다 (ServiceMonitor CRD가 있어야 한다)
+prometheus:
+  servicemonitor:
+    enabled: false

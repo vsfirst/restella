@@ -1,0 +1,36 @@
+# demo MariaDB. 루트 Application(App of Apps)이 이 디렉토리를 동기화한다 (infra/gitops/bootstrap)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mariadb
+  namespace: argocd
+  annotations:
+    # 앱보다 먼저 뜬다: 0 클러스터 구성(ESO 등) → 1 DB → 2 back-end(마이그레이션 Job 포함) → 3 front-end
+    argocd.argoproj.io/sync-wave: "1"
+  # resources-finalizer를 달지 않는다. Application을 실수로 지워도 DB 리소스가 함께 지워지지 않게 한다
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/vsfirst/restella.git
+    targetRevision: main
+    path: infra/gitops/charts/mariadb
+    helm:
+      releaseName: mariadb
+      valueFiles:
+        - ../../values/demo/mariadb.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: restella
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    # 앞 단계가 막 떠서 일시적으로 실패할 수 있다(예: cert-manager·ESO webhook의 CA 주입 전). 기본값은 재시도하지 않는다
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

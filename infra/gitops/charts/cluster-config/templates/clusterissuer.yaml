@@ -1,0 +1,20 @@
+{{- range .Values.certIssuers }}
+# Let's Encrypt 발급자. Ingress에 cert-manager.io/cluster-issuer: {{ .name }} 를 붙이면 인증서를 발급한다.
+# HTTP-01: Let's Encrypt가 http://<호스트>/.well-known/acme-challenge/로 확인한다. Traefik의 HTTPS 리디렉션을 따라가도 된다
+# (Let's Encrypt와 cert-manager의 사전 점검 모두 리디렉션을 따라가고 HTTPS 인증서를 검증하지 않는다)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .name }}
+spec:
+  acme:
+    server: {{ .server }}
+    # 이메일은 두지 않는다(선택 항목). 공개 저장소에 개인정보를 넣지 않고, Let's Encrypt도 만료 안내 메일을 보내지 않는다
+    privateKeySecretRef:
+      name: {{ .name }}-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: {{ $.Values.ingressClassName }}
+---
+{{- end }}

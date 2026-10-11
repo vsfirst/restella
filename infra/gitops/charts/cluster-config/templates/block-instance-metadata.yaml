@@ -1,0 +1,27 @@
+{{- range .Values.blockInstanceMetadata.namespaces }}
+# 이 네임스페이스의 Pod가 인스턴스 메타데이터에 닿지 못하게 한다. 나머지 나가는 트래픽은 그대로 허용한다
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: block-instance-metadata
+  namespace: {{ .name }}
+spec:
+  podSelector:
+    {{- if .excludeApps }}
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: NotIn # 레이블이 없는 Pod도 고른다
+        values: {{ toJson .excludeApps }}
+    {{- else }}
+    {}
+    {{- end }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - {{ $.Values.blockInstanceMetadata.cidr }}
+---
+{{- end }}

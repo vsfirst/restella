@@ -1,0 +1,87 @@
+# 환경별 값은 infra/gitops/values/<환경>/back-end.yaml, 이미지 다이제스트는 CI가 쓰는 back-end-image.yaml에서 덮어쓴다
+
+image:
+  # ECR 레지스트리 주소(<계정 ID>.dkr.ecr.<리전>.amazonaws.com). 공개 저장소라 Git에 두지 않는다.
+  # ApplicationSet이 클러스터 Secret의 annotation에서 넣는다 (docs/adr/0005-cluster-bootstrap.md 결정 4)
+  registry: ""
+  repository: restella-demo/back-end
+  tag: ""
+  digest: "" # CI가 쓴다. 있으면 태그 대신 다이제스트로 받는다
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ecr-pull # cluster-config가 만드는 ECR pull Secret
+
+# 1로 고정한다. 시뮬레이터가 가짜 채널이 받은 재고를 Pod 메모리에 두고,
+# 시드가 가짜 채널 주소를 자기 자신(SIMULATOR_TARGET_URL)으로 만들기 때문이다
+replicas: 1
+
+db:
+  host: mariadb # 같은 네임스페이스의 Service
+  port: 3306
+  name: restella
+  user: restella
+
+# 비밀이 아닌 환경변수
+env:
+  JWT_TTL_SECONDS: "28800" # 8시간 (AC-18-2)
+  SIMULATOR_TARGET_URL: http://localhost:3000 # 시뮬레이터가 예약을 보낼 주소: 같은 Pod의 API
+  SIMULATOR_FAULTS_JSON: "" # 장애 주입. 예: '{"OTA_C":{"failureRate":0.3,"delayMs":0}}'
+
+# 비밀 환경변수. 이 Secret의 키 이름이 곧 환경변수 이름이다
+secret:
+  name: back-end
+  externalSecret:
+    enabled: false
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: aws-secrets-manager
+    remoteKey: restella-demo
+    property: be # 비밀값 JSON의 be 객체 (infra/README.md "비밀값 키")
+  # API 서버가 받는 키. SEED_OPERATOR_PASSWORD는 시드 Job만 받는다
+  apiKeys: [DB_PASSWORD, JWT_SECRET, OUTBOUND_SIGNING_SECRET, CHANNEL_SECRETS_JSON]
+  seedKeys: [SEED_OPERATOR_PASSWORD]
+
+# 배포할 때마다 앱보다 먼저 마이그레이션 → 시드를 실행한다 (Argo CD Sync 훅, wave 0)
+migration:
+  enabled: true
+  seed: true # 시드는 다시 실행해도 안전하다 (객실타입·채널·운영자는 덮어쓰고, 재고는 없는 날짜만 넣는다)
+  # 새 Pod는 네트워크 정책이 반영되기 전 첫 DB 연결이 막힐 수 있다. 실패하면 Job이 다시 실행한다
+  backoffLimit: 6
+  activeDeadlineSeconds: 600
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 256Mi }
+
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits: { memory: 512Mi }
+
+service:
+  name: api # front-end가 부르는 주소: http://api.<네임스페이스>.svc.cluster.local:3000 (front-end 코드에 고정)
+  port: 3000
+
+# 밖에 여는 것은 채널 API와 API 문서뿐이다. 운영자 API는 front-end 서버(BFF)만 부르고,
+# 시뮬레이터 수신 주소(/internal/simulator)와 지표(/metrics)는 열지 않는다
+ingress:
+  enabled: false
+  className: traefik
+  host: "" # api.<도메인>. ApplicationSet이 클러스터 Secret의 annotation에서 넣는다
+  annotations: {}
+  tlsSecretName: back-end-tls
+  paths:
+    - { path: /api/v1/channel, pathType: Prefix }
+    - { path: /api/docs, pathType: Prefix }
+    - { path: /api/docs-json, pathType: Exact } # Swagger UI가 읽는 문서 JSON
+
+networkPolicy:
+  enabled: true
+  # 3000 포트에 들어올 수 있는 Pod (같은 네임스페이스)
+  allowedClients:
+    - app.kubernetes.io/name: front-end
+  # 외부 요청을 넘겨주는 Ingress 컨트롤러 (k3s 기본 Traefik)
+  ingressController:
+    namespace: kube-system
+    podLabels:
+      app.kubernetes.io/name: traefik

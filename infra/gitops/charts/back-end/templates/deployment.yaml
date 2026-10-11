@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: back-end
+  labels:
+    {{- include "back-end.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1" # 마이그레이션 Job(0)이 끝난 뒤
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      {{- include "back-end.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        {{- include "back-end.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+    spec:
+      automountServiceAccountToken: false # Kubernetes API를 쓸 일이 없다
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30 # 진행 중인 채널 동기화 전송을 끝내고 내려간다 (beforeApplicationShutdown)
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "back-end.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: api
+          image: {{ include "back-end.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- include "back-end.env" . | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 3000
+          startupProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 3
+            failureThreshold: 40
+          readinessProbe: # DB까지 확인한다. DB가 안 되면 트래픽을 받지 않는다
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe: # 프로세스만 확인한다. DB 장애로 API를 재시작하지 않는다
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- include "back-end.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

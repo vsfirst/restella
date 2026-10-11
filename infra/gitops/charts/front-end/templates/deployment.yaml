@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: front-end
+  labels:
+    {{- include "front-end.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      {{- include "front-end.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "front-end.selectorLabels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsUser: 1000 # node 이미지의 node 사용자
+        runAsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: front-end
+          image: {{ include "front-end.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: APP_ENV
+              value: {{ .Values.appEnv | quote }}
+            {{- range .Values.secret.keys }}
+            - name: {{ . }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.secret.name }}
+                  key: {{ . }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 3000
+          # /api/health는 프로세스만 본다. 세션과 back-end 상태는 보지 않는다
+          startupProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 3
+            failureThreshold: 40
+          readinessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: next-cache
+              mountPath: /app/.next/cache # Next.js 런타임 캐시
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: next-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

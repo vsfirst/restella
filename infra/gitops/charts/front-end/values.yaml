@@ -1,0 +1,54 @@
+# 환경별 값은 infra/gitops/values/<환경>/front-end.yaml, 이미지 다이제스트는 CI가 쓰는 front-end-image.yaml에서 덮어쓴다
+
+image:
+  # ECR 레지스트리 주소(계정 ID 포함). Git에 두지 않고 ApplicationSet이 클러스터 Secret annotation에서 넣는다
+  registry: ""
+  repository: restella-demo/front-end
+  tag: ""
+  digest: "" # CI가 쓴다
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ecr-pull
+
+# 세션은 암호화 쿠키(iron-session)라 Pod가 상태를 갖지 않는다. 노드 한 대라 1개로 둔다
+replicas: 1
+
+# 실행 환경. local이 아니면 back-end를 클러스터 주소(http://api.restella.svc.cluster.local:3000)로 부르고(코드에 고정),
+# 세션 쿠키에 Secure를 붙인다 (front-end/src/shared/config/env.server.ts)
+appEnv: demo
+
+secret:
+  name: front-end
+  externalSecret:
+    enabled: false
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: aws-secrets-manager
+    remoteKey: restella-demo
+    property: fe # 비밀값 JSON의 fe 객체: SESSION_SECRET
+  keys: [SESSION_SECRET]
+
+resources:
+  requests: { cpu: 50m, memory: 128Mi }
+  limits: { memory: 384Mi }
+
+service:
+  name: front-end
+  port: 3000
+
+ingress:
+  enabled: false
+  className: traefik
+  host: "" # fe.<도메인>. ApplicationSet이 클러스터 Secret의 annotation에서 넣는다
+  annotations: {}
+  tlsSecretName: front-end-tls
+
+networkPolicy:
+  enabled: true
+  # 콘솔은 Ingress 컨트롤러(k3s 기본 Traefik)를 거쳐서만 들어온다
+  ingressController:
+    namespace: kube-system
+    podLabels:
+      app.kubernetes.io/name: traefik

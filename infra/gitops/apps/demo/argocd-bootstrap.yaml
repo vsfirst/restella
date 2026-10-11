@@ -1,0 +1,29 @@
+# Argo CD가 자기 설치 정의(bootstrap/demo의 HelmChart)와 루트 Application을 Git과 맞춘다
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-bootstrap
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/vsfirst/restella.git
+    targetRevision: main
+    path: infra/gitops/bootstrap/demo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      # 지우지는 않는다. 파일을 실수로 지워도 Argo CD 자신과 루트 Application이 사라지지 않게 한다
+      prune: false
+      selfHeal: true
+    # 앞 단계가 막 떠서 일시적으로 실패할 수 있다(예: cert-manager·ESO webhook의 CA 주입 전). 기본값은 재시도하지 않는다
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

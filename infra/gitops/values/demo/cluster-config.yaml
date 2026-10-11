@@ -1,0 +1,2 @@
+# demo 클러스터 공통 설정 (charts/cluster-config/values.yaml을 덮어쓴다). 기본값이 demo 기준이라 덮어쓸 값이 없다
+{}

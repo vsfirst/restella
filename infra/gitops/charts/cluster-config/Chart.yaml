@@ -1,0 +1,5 @@
+apiVersion: v2
+name: cluster-config
+description: 클러스터 공통 설정. 네임스페이스, Secrets Manager 연결(ClusterSecretStore), ECR pull Secret, 인스턴스 메타데이터 차단, Let's Encrypt 발급자, Traefik HTTPS 리디렉션
+type: application
+version: 0.1.0

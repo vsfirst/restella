@@ -1,0 +1,5 @@
+apiVersion: v2
+name: back-end
+description: Restella back-end(재고 원장 API와 채널 시뮬레이터). 마이그레이션·시드 Job, API Deployment, Service api, Ingress(채널 API·문서만)
+type: application
+version: 0.1.0

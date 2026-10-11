@@ -1,0 +1,28 @@
+{{- if .Values.networkPolicy.enabled }}
+# 들어오는 접속은 허용한 Pod의 3306만 받는다. DB는 밖으로 나갈 일이 없어 나가는 트래픽은 모두 막는다
+# (인스턴스 메타데이터 주소 169.254.169.254도 여기서 막힌다)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mariadb
+  labels:
+    {{- include "mariadb.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "mariadb.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        {{- range .Values.networkPolicy.allowedClients }}
+        - podSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 3306
+  egress: []
+{{- end }}

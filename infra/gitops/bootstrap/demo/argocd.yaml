@@ -1,0 +1,69 @@
+# Argo CD 설치. k3s의 내장 Helm 컨트롤러(helm.cattle.io)가 이 리소스를 보고 argo-cd 차트를 설치·업그레이드한다.
+# - 최초 1회: infra/scripts/bootstrap-demo-argocd.sh가 노드에서 이 파일과 root.yaml을 적용한다
+# - 이후: Argo CD의 argocd-bootstrap Application(apps/demo/argocd-bootstrap.yaml)이 이 파일을 Git과 맞춘다.
+#   그래서 Argo CD 설정 변경도 Git 커밋으로만 한다
+# 결정: docs/adr/0005-cluster-bootstrap.md
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: argo-cd
+  namespace: kube-system
+spec:
+  repo: https://argoproj.github.io/argo-helm
+  chart: argo-cd
+  version: 10.10.2 # Argo CD v3.5.4 (docs/2-design/tech-stack.md)
+  targetNamespace: argocd
+  createNamespace: true
+  valuesContent: |-
+    # 릴리스 이름(argo-cd)이 붙지 않은 표준 이름(argocd-server 등)을 쓴다
+    fullnameOverride: argocd
+
+    crds:
+      install: true
+      keep: true # 차트를 지워도 Application 정의(CRD)는 남긴다
+
+    configs:
+      cm:
+        # 하위 Application의 상태(health)를 판단해 sync wave 순서를 지키게 한다.
+        # Argo CD 1.8에서 기본 판단이 빠졌다. 원문: docs/operator-manual/upgrading/1.7-1.8.md
+        resource.customizations.health.argoproj.io_Application: |
+          hs = {}
+          hs.status = "Progressing"
+          hs.message = ""
+          if obj.status ~= nil then
+            if obj.status.health ~= nil then
+              hs.status = obj.status.health.status
+              if obj.status.health.message ~= nil then
+                hs.message = obj.status.health.message
+              end
+            end
+          end
+          return hs
+
+    # SSO와 알림은 쓰지 않는다 (관리자 계정 하나, 초기 비밀번호는 argocd-initial-admin-secret)
+    dex:
+      enabled: false
+    notifications:
+      enabled: false
+
+    # t4g.large(8GiB) 한 대에 앱, DB, 모니터링과 함께 돈다
+    controller:
+      resources:
+        requests: { cpu: 100m, memory: 256Mi }
+        limits: { memory: 768Mi }
+    repoServer:
+      resources:
+        requests: { cpu: 50m, memory: 128Mi }
+        limits: { memory: 512Mi }
+    server:
+      resources:
+        requests: { cpu: 50m, memory: 96Mi }
+        limits: { memory: 256Mi }
+    applicationSet:
+      resources:
+        requests: { cpu: 25m, memory: 64Mi }
+        limits: { memory: 128Mi }
+    redis:
+      resources:
+        requests: { cpu: 25m, memory: 64Mi }
+        limits: { memory: 128Mi }

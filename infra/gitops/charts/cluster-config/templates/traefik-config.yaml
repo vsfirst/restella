@@ -1,0 +1,19 @@
+{{- if .Values.traefik.redirectToHttps }}
+# k3s 내장 Traefik의 설정을 덮어쓴다 (k3s Helm 컨트롤러가 traefik 차트 values에 합친다).
+# 80번으로 들어온 요청을 모두 HTTPS로 영구 리디렉션한다. 콘솔 세션 쿠키가 Secure라 HTTP로는 로그인할 수 없다
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    ports:
+      web:
+        http:
+          redirections:
+            entryPoint:
+              to: websecure
+              scheme: https
+              permanent: true
+{{- end }}

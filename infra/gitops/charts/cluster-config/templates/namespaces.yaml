@@ -1,0 +1,12 @@
+{{- range .Values.namespaces }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ . }}
+  labels:
+    app.kubernetes.io/part-of: restella
+  annotations:
+    # 네임스페이스를 지우면 안의 데이터(PVC)까지 지워진다. Argo CD가 지우지 않게 한다
+    argocd.argoproj.io/sync-options: Delete=false
+---
+{{- end }}

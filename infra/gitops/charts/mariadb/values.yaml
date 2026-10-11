@@ -1,0 +1,58 @@
+# 환경별 값은 infra/gitops/values/<환경>/mariadb.yaml에서 덮어쓴다
+
+image:
+  repository: docker.io/library/mariadb
+  tag: "12.3.3" # LTS. 로컬 compose, back-end 통합 테스트(Testcontainers)와 같은 버전
+  # 같은 태그가 다른 이미지를 가리키지 않게 다이제스트로 고정한다 (멀티 아키텍처 인덱스: amd64, arm64)
+  digest: sha256:2bdff1534a7e569fecaf4b10b66ad0d410806e382d9db29ba305448addda97c4
+  pullPolicy: IfNotPresent
+
+# 처음 초기화할 때 만들 데이터베이스와 앱 사용자. 테이블은 back-end 마이그레이션이 만든다
+auth:
+  database: restella
+  username: restella
+  # 앱 사용자 비밀번호를 담은 Secret. externalSecret.enabled면 External Secrets Operator가 이 Secret을 만든다.
+  # MariaDB는 처음 초기화할 때의 비밀번호를 데이터에 저장한다. 나중에 Secret 값만 바꾸면 접속이 끊긴다
+  passwordSecret:
+    name: mariadb
+    key: password
+
+# AWS Secrets Manager의 값을 Kubernetes Secret으로 가져온다 (ESO가 클러스터에 있어야 한다)
+externalSecret:
+  enabled: false
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: aws-secrets-manager
+  remoteKey: restella-demo # 비밀값 이름
+  property: be.DB_PASSWORD # JSON 안의 경로. back-end와 같은 값을 쓴다
+
+# /etc/mysql/conf.d/restella.cnf로 들어간다. 로컬 compose의 서버 옵션과 같다
+config: |
+  [mariadb]
+  character-set-server = utf8mb4
+  collation-server = utf8mb4_unicode_ci
+  # 시각은 UTC로 저장한다 (back-end TypeORM timezone 'Z')
+  default-time-zone = +00:00
+  # 접속한 클라이언트 주소를 DNS로 역조회하지 않는다 (지연과 DNS 의존 제거)
+  skip-name-resolve
+
+persistence:
+  size: 2Gi
+  # 비우면 클러스터 기본 StorageClass를 쓴다 (k3s: local-path, 데이터 EBS 볼륨 위)
+  storageClassName: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+# 3306 접속을 허용할 Pod. 같은 네임스페이스에서 이 레이블을 가진 Pod만 접속할 수 있다
+networkPolicy:
+  enabled: true
+  allowedClients:
+    - app.kubernetes.io/name: back-end # API 서버와 마이그레이션·시드 Job
+
+terminationGracePeriodSeconds: 60 # 정상 종료(버퍼 기록)할 시간을 준다

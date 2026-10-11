@@ -1,0 +1,28 @@
+{{- if .Values.networkPolicy.enabled }}
+# 콘솔에 들어오는 접속은 Ingress 컨트롤러만. 나가는 트래픽(back-end API)은 네임스페이스 공통 정책(메타데이터 차단)을 따른다
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: front-end
+  labels:
+    {{- include "front-end.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "front-end.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        {{- with .Values.networkPolicy.ingressController }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .podLabels | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 3000
+{{- end }}
