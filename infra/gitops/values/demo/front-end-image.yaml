@@ -1,0 +1,6 @@
+# CI가 갱신한다 (.github/workflows/demo-front-end.yaml). 손으로 고치지 않는다.
+# 레지스트리 주소(AWS 계정 ID 포함)는 공개 저장소에 두지 않는다 (infra/README.md "앱 배포 워크플로")
+image:
+  repository: restella-demo/front-end
+  tag: "13bafcedb193ddc82b52e455106dedb699773a76"
+  digest: "sha256:00c35d61ee4d79352a7dc4ae8bc492d36bb26137f2f035afd2f6cedf16c68608"
