@@ -29,6 +29,8 @@ GitHub Actions ──(1) 이미지 빌드·푸시──▶ ECR (restella-demo/fr
 
 - GitHub OIDC 공급자는 계정에 하나만 둘 수 있어서 계정 공용 스택인 `global`에 둔다. 처음에는 `bootstrap`에 두었으나, bootstrap의 state는 로컬 파일이라 잃어버리기 쉬워서 S3에 state를 두는 `global`로 옮겼다(2026-10-11, 적용 전).
 - 처음 계획은 GHCR이었으나 ECR로 바꿨다.
+- 워크플로는 앱별로 나눈다(`demo-front-end.yaml`, `demo-back-end.yaml`, 사람 결정 2026-10-11). 한 저장소에 앱 둘과 infra가 함께 있어서, 바뀐 앱만 테스트·빌드·배포한다. 세부 결정은 [infra 설계](../../infra/README.md#앱-배포-워크플로-githubworkflows)에 있다.
+- gitops 값 파일에는 레지스트리 주소를 두지 않는다. 주소에 AWS 계정 ID가 있고 저장소가 공개이기 때문이다. 저장소 이름, 태그, 다이제스트만 적는다.
 
 ### 2. 클러스터가 ECR 이미지를 받는 방법
 

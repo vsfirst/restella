@@ -42,7 +42,7 @@
 | OS | Amazon Linux 2023 (arm64, 커널 6.18) | AMI는 SSM 공개 파라미터로 최신 사용 | 사람 결정 ([ADR-0002](../adr/0002-demo-node-os-and-instance.md)). 커널은 최신 LTS |
 | IaC | Terraform / AWS provider | 1.16.5 / 6.68.0 | 최신 |
 | 클러스터 | k3s | v1.36.5+k3s1 | 호환 |
-| 배포 | Argo CD (Helm 차트) | 3.5.4 (argo-cd 10.10.1) | 최신 |
+| 배포 | Argo CD (Helm 차트) | 3.5.4 (argo-cd 10.10.2) | 최신. 같은 앱 버전의 최신 차트 패치 |
 | | Helm CLI | 4.2.1 | 호환 |
 | TLS | demo: cert-manager + Let's Encrypt | v1.21.2 | 최신 (Kubernetes 1.33~1.36 지원) |
 | | prod: ALB + ACM | AWS 관리형 | |
@@ -51,6 +51,11 @@
 | | Grafana | 13.2.3 (grafana 차트 13.4.0) | 최신 (차트 기본값) |
 | 보안 | gitleaks (커밋 전 비밀값 검사) | 8.30.1 | 최신 |
 | CI / 이미지 저장소 | GitHub Actions / Amazon ECR | — | 사람 결정 ([ADR-0003](../adr/0003-delivery-pipeline.md)) |
+| | GitHub Actions 러너 | ubuntu-24.04, ubuntu-24.04-arm | 이미지는 arm64 러너에서 네이티브 빌드 |
+| | actions/checkout · setup-node | v7.0.1 · v7.1.0 | 최신. 커밋 SHA로 고정 |
+| | pnpm/action-setup | v6.1.0 | 최신. pnpm 12를 지원하는 첫 버전 |
+| | aws-actions/configure-aws-credentials · amazon-ecr-login | v6.3.0 · v2.1.7 | 최신 |
+| | docker/setup-buildx-action · build-push-action | v4.4.1 · v7.4.0 | 최신 |
 | 비밀값 | AWS Secrets Manager + External Secrets Operator | ESO 2.12 (helm-chart-2.12.0) | 최신 (Kubernetes 1.36 지원) |
 | AWS | demo: 퍼블릭 EC2 1대 + EIP | t4g.large 스팟 (`use_spot`으로 온디맨드 전환) | 비용 ([ADR-0002](../adr/0002-demo-node-os-and-instance.md)) |
 | | prod: ALB + NAT Gateway + 프라이빗 EC2 (코드만, 배포 안 함) | | |

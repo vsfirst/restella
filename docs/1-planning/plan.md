@@ -21,7 +21,7 @@ ADR과 AI 활용 기록은 모든 단계에 걸친 문서라 `docs` 바로 아�
 | P1 | 설계 | 도메인 모델·ERD, API 명세, 화면 설계(HTML 목업), ADR | 설계 확정 | 완료 (2026-10-09 확정) |
 | P2 | back-end | 재고·예약·취소·중복 처리·충돌 + 불변식 테스트 | 테스트·리뷰 결과 | 구현·테스트 완료, 코드 리뷰 대기 |
 | P3 | front-end | 운영자 콘솔 + 시뮬레이터 | 데모 시나리오 | 구현·테스트 완료, 코드 리뷰 대기 |
-| P4 | infra | Terraform, k3s, Helm 차트, Argo CD, Grafana, CI | | 진행 중 (P1보다 먼저 시작). Terraform bootstrap·global(Route 53)·demo(ECR, Secrets Manager 포함)와 비밀값 입력 스크립트 작성(validate까지 확인, apply 전), 컨테이너 이미지 2개 완료. CI, GitOps(Helm 차트·Argo CD), 모니터링, prod 남음 |
+| P4 | infra | Terraform, k3s, Helm 차트, Argo CD, Grafana, CI | | 진행 중 (P1보다 먼저 시작). Terraform bootstrap·global(Route 53)·demo(ECR, Secrets Manager 포함)와 비밀값 입력 스크립트 작성(bootstrap·global 적용, demo는 ECR·비밀값·CI 역할만 적용. 네트워크·노드 24개는 gitops 준비 뒤 적용), 컨테이너 이미지 2개 완료. CI, GitOps(Helm 차트·Argo CD), 모니터링, prod 남음 |
 | P5 | 마무리 | 문서 정리, 데모, 회고와 한계 | 제출 전 최종 점검 | |
 
 ## P0 체크리스트

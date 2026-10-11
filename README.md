@@ -24,7 +24,7 @@ flowchart LR
 | 2. 디자인 | 화면 설계는 레포 안 HTML 목업으로. 시뮬레이터는 back-end 안 모듈로. 설계 확정 | 도메인 모델·잠금 순서·API 설계. 동시성·중복·동기화·실시간 알림 방식 비교([ADR-0004](docs/adr/0004-reservation-consistency-and-sync.md)). 목업과 스크린샷 10장 | 완료 |
 | 3. 개발 | DTO는 NestJS 관례대로. FSD `entities`·`features` 없애고 `widgets`는 유지. 오류 응답은 RFC 9457 | back-end 모듈 9개, front-end 화면 7개와 BFF, 컨테이너 이미지 | 완료. 코드 리뷰 대기 |
 | 4. 테스트 | 결과 확인 | 불변식 테스트를 먼저 작성. 동시성은 실제 MariaDB로, 시연 시나리오는 실제 브라우저로 검증. 테스트로 문제 12건을 찾아 고침 | 로컬 완료. demo 검증 남음 |
-| 인프라 | demo(실제 배포)와 prod(코드만) 분리. OS는 Amazon Linux 2023(AI는 Ubuntu 추천). t4g.large 스팟. GitOps 배포 | Terraform 작성, validate·plan 확인(apply 전). 네트워크·OS·배포 결정 기록([ADR-0001~0003](docs/adr/)) | 진행 중 |
+| 인프라 | demo(실제 배포)와 prod(코드만) 분리. OS는 Amazon Linux 2023(AI는 Ubuntu 추천). t4g.large 스팟. Route 53은 공용 `global` 스택으로. 비밀값은 1개에 `fe`·`be` 키 2개. 워크플로는 앱별로. 노드는 gitops 준비 뒤에 | Terraform(bootstrap·global 적용, demo는 ECR·비밀값·CI 역할만 적용), 앱별 CI 워크플로, MariaDB 차트, Argo CD·ESO 클러스터 구성. 같은 버전의 k3s를 로컬에 띄워 검증. 결정 기록([ADR-0001~0003, 0005](docs/adr/)) | 진행 중 |
 
 ### AI 결과를 검증한 방법
 
