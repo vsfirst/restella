@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>S-07 채널별 재고 · Restella 목업</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"></script>
+  <style type="text/tailwindcss">
+    @theme { --font-sans: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <div id="shell"></div>
+
+  <main class="mx-auto max-w-7xl px-6 py-4">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <a href="simulator.html" class="text-xs text-slate-500">← 시뮬레이터</a>
+        <h1 class="mt-1 text-xl font-semibold">채널별 재고</h1>
+        <p class="mt-1 text-sm text-slate-500">Restella 원장의 남은 재고와 각 채널이 마지막으로 받은 값을 비교합니다. 동기화가 얼마나 빨리 퍼지는지 확인할 수 있습니다.</p>
+      </div>
+      <div class="flex gap-3">
+        <div class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-right">
+          <p class="text-xs text-slate-500">평균 동기화 지연 (최근 1시간)</p><p class="text-lg font-semibold">0.7초</p>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-right">
+          <p class="text-xs text-slate-500">전송 대기·재시도</p><p class="text-lg font-semibold text-orange-600">1건</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-4 flex items-center gap-2 text-sm">
+      <select class="rounded-md border border-slate-300 bg-white px-3 py-1.5"><option>패밀리 스위트 (FAM-STE)</option></select>
+      <span class="rounded-md border border-slate-300 bg-white px-3 py-1.5">2026-10-10 ~ 2026-10-13</span>
+    </div>
+
+    <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <table id="grid" class="w-full text-sm"></table>
+    </div>
+    <p class="mt-3 text-xs text-slate-500">채널은 받은 revision보다 오래된 값이 늦게 도착하면 무시합니다 (REQ-12). 실패하면 간격을 늘려 최대 5회 다시 보냅니다.</p>
+  </main>
+
+  <script src="shell.js"></script>
+  <script>
+    renderShell('simulator', { screenId: 'S-07', screenName: '채널별 재고 (REQ-20)' });
+
+    const dates = ['10-10 (토)', '10-11 (일)', '10-12 (월)', '10-13 (화)'];
+    const ledger = [0, 1, 2, 3];
+    // [받은 남은 재고, 받은 시각, 상태]
+    const received = {
+      DIRECT: [[0, '0.5초 전', 'ok'], [1, '2시간 전', 'ok'], [2, '3시간 전', 'ok'], [3, '어제', 'ok']],
+      APPROVAL: [[0, '0.6초 전', 'ok'], [1, '2시간 전', 'ok'], [2, '3시간 전', 'ok'], [3, '어제', 'ok']],
+      OTA_A: [[0, '0.6초 전', 'ok'], [1, '2시간 전', 'ok'], [2, '3시간 전', 'ok'], [3, '어제', 'ok']],
+      OTA_B: [[0, '0.7초 전', 'ok'], [1, '2시간 전', 'ok'], [2, '3시간 전', 'ok'], [3, '어제', 'ok']],
+      OTA_C: [[1, '2시간 전', 'retry'], [1, '2시간 전', 'ok'], [2, '3시간 전', 'ok'], [3, '어제', 'ok']],
+    };
+
+    const cell = (v, at, st) => {
+      if (st === 'retry') {
+        return `<div class="rounded-md bg-orange-50 px-3 py-2 ring-1 ring-orange-200">
+          <p class="font-semibold text-orange-700">${v} <span class="text-xs font-normal">(원장과 다름)</span></p>
+          <p class="text-[11px] text-orange-700">재시도 1/5 · 2초 뒤</p></div>`;
+      }
+      return `<div class="rounded-md px-3 py-2 ${v === 0 ? 'bg-rose-50 ring-1 ring-rose-200' : ''}">
+        <p class="font-semibold ${v === 0 ? 'text-rose-700' : ''}">${v === 0 ? '0 · 판매 중지' : v}</p>
+        <p class="text-[11px] text-slate-500">${at} 수신</p></div>`;
+    };
+
+    document.getElementById('grid').innerHTML = `
+      <thead class="bg-slate-50 text-left text-xs text-slate-500"><tr>
+        <th class="px-4 py-2.5 font-medium">채널</th>
+        ${dates.map((d) => `<th class="px-4 py-2.5 font-medium">${d}</th>`).join('')}
+      </tr></thead>
+      <tbody class="divide-y divide-slate-100">
+        <tr class="bg-slate-900 text-white">
+          <td class="px-4 py-3 font-semibold">Restella 원장</td>
+          ${ledger.map((v) => `<td class="px-4 py-3 font-semibold">${v === 0 ? '0 · 매진' : v}</td>`).join('')}
+        </tr>
+        ${CHANNELS.map((c) => `<tr>
+          <td class="px-4 py-3">${channelBadge(c.code)}</td>
+          ${received[c.code].map(([v, at, st]) => `<td class="px-4 py-2">${cell(v, at, st)}</td>`).join('')}
+        </tr>`).join('')}
+      </tbody>`;
+  </script>
+</body>
+</html>

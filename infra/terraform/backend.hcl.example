@@ -1,0 +1,7 @@
+# envs/<환경>/backend.hcl 예시. 실제 파일은 .gitignore로 제외된다.
+# bootstrap의 `terraform output -raw backend_hcl` 결과를 그대로 붙여 넣는다.
+# state 파일 경로(key)는 각 환경의 backend 블록에 적혀 있다.
+bucket       = "restella-tfstate-<계정 ID>-ap-northeast-2"
+region       = "ap-northeast-2"
+encrypt      = true
+use_lockfile = true

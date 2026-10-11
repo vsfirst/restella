@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>S-02 재고 달력 · Restella 목업</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"></script>
+  <style type="text/tailwindcss">
+    @theme { --font-sans: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <div id="shell"></div>
+
+  <main class="mx-auto max-w-7xl px-6 py-4">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 class="text-xl font-semibold">재고 달력</h1>
+        <p class="mt-1 text-sm text-slate-500">칸마다 <b>남은 재고 / 총 재고</b>. 칸을 누르면 총 재고를 조정합니다.</p>
+      </div>
+      <div class="flex items-center gap-2 text-sm">
+        <button class="rounded-md border border-slate-300 bg-white px-2.5 py-1.5">‹</button>
+        <span class="rounded-md border border-slate-300 bg-white px-3 py-1.5">2026-10-10 ~ 2026-10-23 (14일)</span>
+        <button class="rounded-md border border-slate-300 bg-white px-2.5 py-1.5">›</button>
+        <button class="rounded-md border border-slate-300 bg-white px-3 py-1.5">오늘</button>
+      </div>
+    </div>
+
+    <div class="mt-3 flex gap-4 text-xs text-slate-600">
+      <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded bg-white ring-1 ring-slate-300"></span>여유</span>
+      <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded bg-amber-100 ring-1 ring-amber-300"></span>1실 남음</span>
+      <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded bg-rose-100 ring-1 ring-rose-300"></span>매진 (모든 채널 판매 중지)</span>
+    </div>
+
+    <div class="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <table id="grid" class="w-full border-collapse text-sm"></table>
+    </div>
+
+    <p class="mt-3 text-xs text-slate-500">한 번에 최대 31일까지 볼 수 있습니다 (REQ-02). 실시간으로 갱신됩니다.</p>
+  </main>
+
+  <!-- S-02a 총 재고 조정 (inventory.html?modal=adjust) -->
+  <div id="modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/40">
+    <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+      <div class="flex items-start justify-between">
+        <div>
+          <p class="text-[11px] text-slate-400">S-02a 총 재고 조정 (REQ-03)</p>
+          <h2 class="mt-1 text-base font-semibold">디럭스 더블 · 2026-10-17 (토)</h2>
+        </div>
+        <button class="text-slate-400">✕</button>
+      </div>
+      <dl class="mt-5 grid grid-cols-3 gap-3 text-center">
+        <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">판매 수</dt><dd class="mt-1 text-lg font-semibold">5</dd></div>
+        <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">현재 총 재고</dt><dd class="mt-1 text-lg font-semibold">8</dd></div>
+        <div class="rounded-lg bg-slate-50 p-3"><dt class="text-xs text-slate-500">남은 재고</dt><dd class="mt-1 text-lg font-semibold">3 → 2</dd></div>
+      </dl>
+      <label class="mt-5 block text-sm font-medium text-slate-700">새 총 재고</label>
+      <input value="7" class="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+      <p class="mt-1.5 text-xs text-slate-500">판매 수(5)보다 작게 줄일 수 없습니다.</p>
+      <p class="mt-4 rounded-md bg-sky-50 p-3 text-xs text-sky-800">저장하면 바뀐 남은 재고가 모든 채널에 전송됩니다 (REQ-11).</p>
+      <div class="mt-6 flex justify-end gap-2">
+        <button class="rounded-md border border-slate-300 px-4 py-2 text-sm">취소</button>
+        <button class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="shell.js"></script>
+  <script>
+    renderShell('inventory', { screenId: 'S-02', screenName: '재고 달력 (REQ-02, 03)' });
+
+    const start = new Date('2026-10-10T00:00:00');
+    const days = Array.from({ length: 14 }, (_, i) => new Date(start.getTime() + i * 86400000));
+    const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
+    // 남은 재고 (가짜 값). 패밀리 스위트 10-10은 시뮬레이션으로 매진된 날짜다.
+    const remaining = {
+      1: [3, 4, 6, 7, 7, 5, 2, 3, 1, 5, 6, 6, 4, 2],
+      2: [5, 7, 9, 10, 9, 8, 4, 6, 8, 9, 10, 9, 7, 3],
+      3: [0, 1, 2, 3, 3, 2, 0, 1, 2, 3, 3, 3, 2, 1],
+    };
+    const totals = { 1: 8, 2: 12, 3: 4 };
+
+    const head = `<thead><tr class="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+      <th class="sticky left-0 bg-slate-50 px-4 py-2 text-left font-medium">객실타입</th>
+      ${days.map((d) => {
+        const w = d.getDay();
+        const color = w === 0 ? 'text-rose-600' : w === 6 ? 'text-sky-600' : '';
+        return `<th class="px-1 py-2 font-medium ${color}">${d.getMonth() + 1}/${d.getDate()}<br>${WEEK[w]}</th>`;
+      }).join('')}
+    </tr></thead>`;
+
+    const body = ROOM_TYPES.map((rt) => `<tr class="border-b border-slate-100 last:border-0">
+      <th class="sticky left-0 bg-white px-4 py-3 text-left font-medium">${rt.name}<br><span class="text-xs font-normal text-slate-400">${rt.code} · 총 ${totals[rt.id]}실</span></th>
+      ${remaining[rt.id].map((r, i) => {
+        const cls = r === 0
+          ? 'bg-rose-100 text-rose-700 ring-rose-300 font-semibold'
+          : r === 1 ? 'bg-amber-100 text-amber-800 ring-amber-300' : 'bg-white text-slate-700 ring-slate-200';
+        const selected = rt.id === 1 && i === 7 ? 'outline outline-2 outline-slate-900' : '';
+        return `<td class="px-1 py-2 text-center"><div class="mx-auto w-14 rounded-md py-2 ring-1 ${cls} ${selected}">
+          ${r === 0 ? '매진' : `${r}<span class="text-slate-400">/${totals[rt.id]}</span>`}</div></td>`;
+      }).join('')}
+    </tr>`).join('');
+
+    document.getElementById('grid').innerHTML = head + `<tbody>${body}</tbody>`;
+
+    if (new URLSearchParams(location.search).get('modal') === 'adjust') {
+      const m = document.getElementById('modal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+  </script>
+</body>
+</html>

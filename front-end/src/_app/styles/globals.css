@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* 목업(docs/2-design/ui/mockups)과 같은 글꼴. 외부 글꼴을 내려받지 않는다 */
+@theme {
+  --font-sans: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+}

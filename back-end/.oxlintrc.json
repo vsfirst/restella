@@ -1,0 +1,45 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "rules": {
+    "typescript/no-explicit-any": "off",
+    "typescript/no-floating-promises": "error"
+  },
+  "env": {
+    "node": true
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/modules/simulator/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "../auth/*",
+                  "../channel/*",
+                  "../conflict/*",
+                  "../event-log/*",
+                  "../inventory/*",
+                  "../reservation/*",
+                  "../room-type/*",
+                  "../../auth/*",
+                  "../../channel/*",
+                  "../../conflict/*",
+                  "../../event-log/*",
+                  "../../inventory/*",
+                  "../../reservation/*",
+                  "../../room-type/*"
+                ],
+                "message": "시뮬레이터는 HTTP 계약으로만 Restella와 통신한다 (back-end/README.md 시뮬레이터의 경계)"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

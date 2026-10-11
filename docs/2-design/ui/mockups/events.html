@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>S-05 이벤트 로그 · Restella 목업</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"></script>
+  <style type="text/tailwindcss">
+    @theme { --font-sans: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <div id="shell"></div>
+
+  <main class="mx-auto max-w-7xl px-6 py-4">
+    <h1 class="text-xl font-semibold">이벤트 로그</h1>
+    <p class="mt-1 text-sm text-slate-500">예약, 충돌, 재고, 채널 동기화에 일어난 일을 시간순으로 보여줍니다. 기록은 수정되지 않습니다.</p>
+
+    <div id="chips" class="mt-4 flex flex-wrap gap-2 text-xs"></div>
+
+    <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-left text-xs text-slate-500">
+          <tr>
+            <th class="w-60 px-4 py-2.5 font-medium">시각</th>
+            <th class="w-40 px-4 py-2.5 font-medium">유형</th>
+            <th class="px-4 py-2.5 font-medium">내용</th>
+            <th class="w-40 px-4 py-2.5 font-medium">주체</th>
+          </tr>
+        </thead>
+        <tbody id="rows" class="divide-y divide-slate-100"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="shell.js"></script>
+  <script>
+    renderShell('events', { screenId: 'S-05', screenName: '이벤트 로그 (REQ-17)', openConflicts: 17 });
+
+    const TYPES = {
+      RESERVATION_CONFIRMED: ['예약 확정', 'bg-emerald-50 text-emerald-700'],
+      RESERVATION_REJECTED: ['예약 거절', 'bg-slate-100 text-slate-600'],
+      RESERVATION_DUPLICATE: ['중복 요청', 'bg-amber-50 text-amber-700'],
+      RESERVATION_CONFLICT: ['오버부킹 충돌', 'bg-rose-50 text-rose-700'],
+      CONFLICT_RESOLVED: ['충돌 해결됨', 'bg-slate-100 text-slate-700'],
+      INVENTORY_ADJUSTED: ['재고 조정', 'bg-sky-50 text-sky-700'],
+      SYNC_SUCCEEDED: ['동기화 성공', 'bg-teal-50 text-teal-700'],
+      SYNC_FAILED: ['동기화 실패', 'bg-orange-50 text-orange-700'],
+    };
+    document.getElementById('chips').innerHTML =
+      `<span class="rounded-full bg-slate-900 px-3 py-1 font-medium text-white">전체</span>` +
+      Object.values(TYPES).map(([l]) => `<span class="rounded-full border border-slate-300 bg-white px-3 py-1 text-slate-600">${l}</span>`).join('');
+
+    const rows = [
+      ['14:35:40.201', 'CONFLICT_RESOLVED', '충돌 #117 해결됨: "손님과 통화. 인근 제휴 숙소로 안내"', 'OPERATOR:데모 운영자'],
+      ['14:31:06.004', 'SYNC_FAILED', 'OTA C · 패밀리 스위트 10-10 남은 0 전송 실패(시간 초과), 2초 뒤 재시도 1/5', 'SYSTEM'],
+      ['14:31:05.982', 'SYNC_SUCCEEDED', '4개 채널 · 패밀리 스위트 10-10 남은 0(판매 중지) 전송, 지연 0.6초', 'SYSTEM'],
+      ['14:31:05.412', 'RESERVATION_CONFLICT', 'OTA-B-7781 · 패밀리 스위트 10-10 매진, 통보형이라 충돌로 기록', 'CHANNEL:OTA_B'],
+      ['14:31:05.405', 'RESERVATION_DUPLICATE', 'DIRECT-0115 재전송 → 처음 결과(확정)로 응답, 재고 변화 없음', 'CHANNEL:DIRECT'],
+      ['14:31:05.391', 'RESERVATION_REJECTED', 'APV-3302 · 패밀리 스위트 10-10 매진, 확인형이라 거절', 'CHANNEL:APPROVAL'],
+      ['14:31:05.377', 'RESERVATION_CONFIRMED', 'DIRECT-0115 · 패밀리 스위트 10-10 (1박) 확정, 남은 1 → 0', 'CHANNEL:DIRECT'],
+      ['14:31:05.120', 'INVENTORY_ADJUSTED', '패밀리 스위트 10-10 총 재고 3 → 4 (남은 재고 1로 맞춤)', 'SIMULATOR:12'],
+    ];
+    document.getElementById('rows').innerHTML = rows.map(([at, type, text, actor]) => {
+      const [label, cls] = TYPES[type];
+      return `<tr>
+        <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-500">2026-10-09 ${at}</td>
+        <td class="px-4 py-3"><span class="rounded px-2 py-0.5 text-xs font-medium ${cls}">${label}</span></td>
+        <td class="px-4 py-3 text-slate-800">${text}</td>
+        <td class="px-4 py-3 font-mono text-xs text-slate-500">${actor}</td>
+      </tr>`;
+    }).join('');
+  </script>
+</body>
+</html>

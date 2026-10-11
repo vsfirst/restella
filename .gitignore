@@ -1,0 +1,55 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Node
+node_modules/
+.pnpm-store/
+dist/
+.next/
+out/
+coverage/
+*.log
+*.tsbuildinfo
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# Terraform (.terraform.lock.hcl은 커밋한다)
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+backend.hcl
+!backend.hcl.example
+crash.log
+*.tfplan
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+
+# 키·인증서·자격 증명 (공개 저장소: docs/2-design/security.md)
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+id_rsa*
+id_ed25519*
+.aws/
+credentials
+secrets/
+*.secret
+*.secret.*
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/

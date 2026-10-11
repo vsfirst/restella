@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>S-01 로그인 · Restella 목업</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"></script>
+  <style type="text/tailwindcss">
+    @theme { --font-sans: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+  </style>
+</head>
+<body class="flex min-h-screen items-center justify-center bg-slate-50 font-sans text-slate-900">
+  <div class="fixed right-6 top-3 text-[11px] text-slate-400">목업 · S-01 로그인 (REQ-18)</div>
+
+  <main class="w-full max-w-sm">
+    <div class="mb-8 text-center">
+      <p class="text-2xl font-bold tracking-tight">Restella</p>
+      <p class="mt-1 text-sm text-slate-500">여러 채널의 예약을 하나의 재고 원장으로</p>
+    </div>
+
+    <form class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h1 class="text-base font-semibold">운영자 로그인</h1>
+
+      <label class="mt-5 block text-sm font-medium text-slate-700" for="loginId">아이디</label>
+      <input id="loginId" value="demo-operator" class="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+
+      <label class="mt-4 block text-sm font-medium text-slate-700" for="password">비밀번호</label>
+      <input id="password" type="password" value="••••••••••" class="mt-1.5 w-full rounded-md border border-rose-400 px-3 py-2 text-sm ring-2 ring-rose-100">
+      <p class="mt-1.5 text-xs text-rose-600">아이디 또는 비밀번호가 올바르지 않습니다. (4회 남음)</p>
+
+      <button type="button" class="mt-6 w-full rounded-md bg-slate-900 py-2.5 text-sm font-semibold text-white">로그인</button>
+
+      <ul class="mt-5 space-y-1 text-xs text-slate-500">
+        <li>· 로그인하면 8시간 동안 유지됩니다.</li>
+        <li>· 1분에 5회까지 시도할 수 있습니다.</li>
+      </ul>
+    </form>
+  </main>
+</body>
+</html>

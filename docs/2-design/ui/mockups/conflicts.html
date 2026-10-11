@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>S-04 충돌 처리함 · Restella 목업</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"></script>
+  <style type="text/tailwindcss">
+    @theme { --font-sans: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <div id="shell"></div>
+
+  <main class="mx-auto max-w-7xl px-6 py-4">
+    <div class="flex items-end justify-between">
+      <div>
+        <h1 class="text-xl font-semibold">충돌 처리함</h1>
+        <p class="mt-1 text-sm text-slate-500">통보형 채널(OTA)이 매진된 날짜에 이미 확정해 버린 예약입니다. 손님이 도착하기 전에 연락해 처리하세요.</p>
+      </div>
+      <div class="flex rounded-md border border-slate-300 bg-white p-0.5 text-sm">
+        <button class="rounded bg-slate-900 px-3 py-1 font-medium text-white">미처리 18</button>
+        <button class="px-3 py-1 text-slate-600">처리됨 3</button>
+      </div>
+    </div>
+
+    <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-left text-xs text-slate-500">
+          <tr>
+            <th class="px-4 py-2.5 font-medium">접수</th>
+            <th class="px-4 py-2.5 font-medium">채널</th>
+            <th class="px-4 py-2.5 font-medium">채널 예약번호</th>
+            <th class="px-4 py-2.5 font-medium">객실타입 · 숙박일</th>
+            <th class="px-4 py-2.5 font-medium">손님</th>
+            <th class="px-4 py-2.5 text-right font-medium">처리</th>
+          </tr>
+        </thead>
+        <tbody id="rows" class="divide-y divide-slate-100"></tbody>
+      </table>
+    </div>
+    <p class="mt-3 text-xs text-slate-500">새 충돌은 새로고침하지 않아도 5초 안에 나타납니다 (REQ-13).</p>
+  </main>
+
+  <!-- 해결됨 처리 (conflicts.html?dialog=resolve) -->
+  <div id="dialog" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/40">
+    <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+      <p class="text-[11px] text-slate-400">S-04 해결됨 처리 (REQ-14 AC-14-2)</p>
+      <h2 class="mt-1 text-base font-semibold">충돌 #117 · OTA A · 패밀리 스위트 10-10</h2>
+      <p class="mt-2 text-sm text-slate-600">숙소 밖에서 해결한 경우에 씁니다. 예약은 충돌 상태로 남고 처리 기록만 남습니다.</p>
+      <label class="mt-4 block text-sm font-medium text-slate-700">메모 <span class="text-rose-600">(필수)</span></label>
+      <textarea rows="3" class="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">손님과 통화. 인근 제휴 숙소 같은 등급 객실로 안내, 차액은 숙소 부담.</textarea>
+      <div class="mt-6 flex justify-end gap-2">
+        <button class="rounded-md border border-slate-300 px-4 py-2 text-sm">닫기</button>
+        <button class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white">해결됨으로 처리</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="shell.js"></script>
+  <script>
+    renderShell('conflicts', { screenId: 'S-04', screenName: '충돌 처리함 (REQ-13, 14, 15)' });
+
+    const rows = [
+      ['3초 전', 'OTA_B', 'OTA-B-7781', '패밀리 스위트 · 10-10 (1박)', '테스트 손님 18', false],
+      ['3초 전', 'OTA_A', 'OTA-A-5520', '패밀리 스위트 · 10-10 (1박)', '테스트 손님 17', false],
+      ['3초 전', 'OTA_C', 'OTA-C-1044', '패밀리 스위트 · 10-10 (1박)', '테스트 손님 14', false],
+      ['3초 전', 'OTA_A', 'OTA-A-5517', '패밀리 스위트 · 10-10 (1박)', '테스트 손님 12', false],
+      ['2시간 전', 'OTA_B', 'OTA-B-7710', '디럭스 더블 · 10-16 → 10-18 (2박)', '테스트 손님 7', true],
+    ];
+    document.getElementById('rows').innerHTML = rows.map(([at, ch, no, stay, guest, canMove], i) => `
+      <tr class="${i === 1 ? 'bg-rose-50/50' : ''}">
+        <td class="px-4 py-3 text-xs ${at === '3초 전' ? 'font-semibold text-rose-600' : 'text-slate-500'}">${at}</td>
+        <td class="px-4 py-3">${channelBadge(ch)}</td>
+        <td class="px-4 py-3 font-mono text-xs text-slate-600">${no}</td>
+        <td class="px-4 py-3">${stay}</td>
+        <td class="px-4 py-3">${guest}</td>
+        <td class="px-4 py-3">
+          <div class="flex justify-end gap-2">
+            <button class="rounded-md border px-2.5 py-1 text-xs ${canMove ? 'border-slate-300 text-slate-700' : 'border-slate-200 text-slate-300'}"
+              title="${canMove ? '스탠다드 트윈에 재고 있음' : '같은 날짜에 재고 있는 객실타입 없음'}">다른 객실타입으로 옮기기</button>
+            <button class="rounded-md border border-slate-300 px-2.5 py-1 text-xs text-slate-700">해결됨</button>
+            <button class="rounded-md bg-rose-600 px-2.5 py-1 text-xs font-medium text-white">취소</button>
+          </div>
+        </td>
+      </tr>`).join('') + `<tr><td colspan="6" class="px-4 py-3 text-center text-sm text-slate-500">외 13건 더 보기</td></tr>`;
+
+    if (new URLSearchParams(location.search).get('dialog') === 'resolve') {
+      const d = document.getElementById('dialog');
+      d.classList.remove('hidden');
+      d.classList.add('flex');
+    }
+  </script>
+</body>
+</html>

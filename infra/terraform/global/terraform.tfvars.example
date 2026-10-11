@@ -1,0 +1,6 @@
+# 이 파일을 terraform.tfvars로 복사해서 실제 값을 넣는다. terraform.tfvars는 커밋하지 않는다.
+hosted_zone_name = "restella.example.com"
+
+# 이미 있는 영역을 가져올 때만 넣는다 (Route 53 콘솔 또는 아래 명령으로 확인)
+# aws route53 list-hosted-zones --query "HostedZones[?Name=='restella.example.com.'].Id" --output text | sed 's|/hostedzone/||'
+# existing_hosted_zone_id = "Z0123456789EXAMPLE"

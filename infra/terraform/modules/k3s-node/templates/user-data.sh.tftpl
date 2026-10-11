@@ -1,0 +1,48 @@
+#!/bin/bash
+# 최초 부팅 때 한 번 실행된다: 데이터 볼륨 마운트 → k3s 설치.
+# 재부팅(스팟 회수 후 재시작 포함) 때는 fstab과 systemd가 각각 마운트와 k3s 기동을 맡는다.
+set -euo pipefail
+exec > >(tee -a /var/log/restella-bootstrap.log) 2>&1
+
+DATA_DEVICE="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${data_volume_serial}"
+MOUNT_POINT="/var/lib/rancher/k3s/storage" # k3s local-path 프로비저너의 기본 경로
+
+# 1. 데이터 볼륨 연결 대기 (볼륨은 인스턴스 생성 직후 연결되므로 최대 5분 기다린다)
+for _ in $(seq 1 60); do
+  [ -e "$DATA_DEVICE" ] && break
+  sleep 5
+done
+if [ ! -e "$DATA_DEVICE" ]; then
+  echo "데이터 볼륨이 연결되지 않았다: $DATA_DEVICE" >&2
+  exit 1
+fi
+
+# 2. 파일시스템이 없을 때만 포맷한다. 기존 데이터는 절대 지우지 않는다
+if ! blkid "$DATA_DEVICE" > /dev/null 2>&1; then
+  mkfs.xfs -L k3s-data "$DATA_DEVICE"
+fi
+
+mkdir -p "$MOUNT_POINT"
+DATA_UUID=$(blkid -s UUID -o value "$DATA_DEVICE")
+if ! grep -q "$DATA_UUID" /etc/fstab; then
+  echo "UUID=$DATA_UUID $MOUNT_POINT xfs defaults,nofail 0 2" >> /etc/fstab
+fi
+mount -a
+
+# 3. k3s 설정
+mkdir -p /etc/rancher/k3s
+cat > /etc/rancher/k3s/config.yaml <<EOF
+node-name: ${node_name}
+write-kubeconfig-mode: "0600"
+secrets-encryption: true
+EOF
+
+# 4. k3s 설치 (버전 고정)
+# k3s 설치 스크립트는 AL2023(VERSION_ID=2023)을 el8 대상으로 판단해 CentOS 8용 SELinux 패키지를 설치하려 한다.
+# AL2023은 Fedora 계열이라 대상이 맞지 않으므로 건너뛰고, SELinux는 AL2023 기본값(permissive)을 유지한다.
+curl -sfL https://get.k3s.io | \
+  INSTALL_K3S_VERSION="${k3s_version}" \
+  INSTALL_K3S_SKIP_SELINUX_RPM=true \
+  sh -s - server
+
+echo "bootstrap 완료"

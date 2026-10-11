@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>S-06 시뮬레이터 · Restella 목업</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"></script>
+  <style type="text/tailwindcss">
+    @theme { --font-sans: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+  <div id="shell"></div>
+
+  <main class="mx-auto max-w-7xl px-6 py-4">
+    <div class="flex items-end justify-between">
+      <div>
+        <h1 class="text-xl font-semibold">동시 예약 시뮬레이터</h1>
+        <p class="mt-1 text-sm text-slate-500">"마지막 1실"에 여러 채널의 예약을 동시에 보냅니다. 실제 채널 API로 서명된 요청을 보냅니다.</p>
+      </div>
+      <a href="channels.html" class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm">채널별 재고 보기 →</a>
+    </div>
+
+    <div class="mt-5 grid grid-cols-[360px_1fr] gap-6">
+      <!-- 조건 -->
+      <form class="rounded-xl border border-slate-200 bg-white p-5 text-sm">
+        <h2 class="font-semibold">실행 조건</h2>
+        <label class="mt-4 block text-xs text-slate-500">객실타입</label>
+        <select class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"><option>패밀리 스위트 (FAM-STE)</option></select>
+        <div class="mt-3 grid grid-cols-2 gap-3">
+          <div><label class="block text-xs text-slate-500">체크인</label><input value="2026-10-10" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"></div>
+          <div><label class="block text-xs text-slate-500">체크아웃</label><input value="2026-10-11" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"></div>
+        </div>
+        <label class="mt-3 block text-xs text-slate-500">실행 전 남은 재고 맞추기</label>
+        <input value="1" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2">
+        <label class="mt-3 block text-xs text-slate-500">요청 수 (1~100)</label>
+        <input value="50" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2">
+        <label class="mt-3 flex justify-between text-xs text-slate-500"><span>통보형 채널 비율</span><span class="font-medium text-slate-800">40%</span></label>
+        <input type="range" value="40" class="mt-2 w-full accent-slate-900">
+        <label class="mt-3 flex justify-between text-xs text-slate-500"><span>같은 예약 재전송 비율</span><span class="font-medium text-slate-800">10%</span></label>
+        <input type="range" value="10" class="mt-2 w-full accent-slate-900">
+        <button type="button" class="mt-5 w-full rounded-md bg-slate-900 py-2.5 font-semibold text-white">50건 동시 실행</button>
+      </form>
+
+      <!-- 결과 -->
+      <section class="rounded-xl border border-slate-200 bg-white p-5">
+        <div class="flex items-baseline justify-between">
+          <h2 class="font-semibold">실행 #12 결과</h2>
+          <span class="text-xs text-slate-500">2026-10-09 14:31:05 · 소요 1.8초</span>
+        </div>
+
+        <div class="mt-4 grid grid-cols-4 gap-3">
+          <div class="rounded-lg bg-emerald-50 p-4"><p class="text-xs text-emerald-700">확정</p><p class="mt-1 text-3xl font-semibold text-emerald-800">1</p></div>
+          <div class="rounded-lg bg-slate-100 p-4"><p class="text-xs text-slate-600">거절 (확인형)</p><p class="mt-1 text-3xl font-semibold text-slate-800">26</p></div>
+          <div class="rounded-lg bg-rose-50 p-4"><p class="text-xs text-rose-700">충돌 (통보형)</p><p class="mt-1 text-3xl font-semibold text-rose-800">18</p></div>
+          <div class="rounded-lg bg-amber-50 p-4"><p class="text-xs text-amber-700">중복 요청</p><p class="mt-1 text-3xl font-semibold text-amber-800">5</p></div>
+        </div>
+
+        <div class="mt-4 flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <span class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-white">✓</span>
+          <div>
+            <p class="text-sm font-semibold text-emerald-900">초과 판매 0건 · 판매 수 4 ≤ 총 재고 4</p>
+            <p class="text-xs text-emerald-800">50건 중 1건만 확정. 통보형 채널이 이미 판매한 18건은 거절하지 않고 충돌로 드러냈습니다.</p>
+          </div>
+        </div>
+
+        <h3 class="mt-6 text-sm font-semibold">이전 실행</h3>
+        <table class="mt-2 w-full text-sm">
+          <thead class="text-left text-xs text-slate-500">
+            <tr><th class="py-1.5 font-medium">#</th><th class="font-medium">조건</th><th class="font-medium">확정</th><th class="font-medium">거절</th><th class="font-medium">충돌</th><th class="font-medium">중복</th><th class="font-medium">초과 판매</th></tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr><td class="py-2">12</td><td>FAM-STE 10-10 · 남은 1 · 50건</td><td>1</td><td>26</td><td>18</td><td>5</td><td class="font-medium text-emerald-700">0</td></tr>
+            <tr><td class="py-2">11</td><td>DLX-DBL 10-17~19 · 남은 2 · 30건</td><td>2</td><td>28</td><td>0</td><td>0</td><td class="font-medium text-emerald-700">0</td></tr>
+            <tr><td class="py-2">10</td><td>STD-TWN 10-12 · 남은 1 · 100건</td><td>1</td><td>49</td><td>40</td><td>10</td><td class="font-medium text-emerald-700">0</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </main>
+
+  <script src="shell.js"></script>
+  <script>
+    renderShell('simulator', { screenId: 'S-06', screenName: '동시 예약 시뮬레이터 (REQ-19)' });
+    showToast('새 오버부킹 충돌 18건', '패밀리 스위트 10-10 · OTA A, OTA B, OTA C', 'conflicts.html');
+  </script>
+</body>
+</html>

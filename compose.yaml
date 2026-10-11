@@ -1,0 +1,98 @@
+# 로컬 전체 실행 (Docker): MariaDB → 마이그레이션·시드 → back-end → front-end. 운영(k3s)과 같은 이미지 버전을 쓴다
+# 사용: cp .env.example .env && cp front-end/.env.example front-end/.env.local  →  docker compose up -d --build --wait
+# 운영자 콘솔: http://localhost:3200 (데모 운영자 demo-operator, 비밀번호는 루트 .env의 SEED_OPERATOR_PASSWORD)
+# 값은 루트 .env에서 읽는다 (커밋하지 않는다). 운영 비밀값은 Secrets Manager(restella-demo)에 있다
+name: restella
+
+# back-end 컨테이너 공통 환경변수. 비밀값은 루트 .env에서 읽고, 없으면 실행을 멈춘다
+x-back-end-env: &back-end-env
+  NODE_ENV: production
+  PORT: 3000
+  DB_HOST: mariadb
+  DB_PORT: 3306
+  DB_USER: ${DB_USER:-restella}
+  DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD를 루트 .env에 넣어야 한다}
+  DB_NAME: ${DB_NAME:-restella}
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET을 루트 .env에 넣어야 한다 (32자 이상)}
+  JWT_TTL_SECONDS: ${JWT_TTL_SECONDS:-28800}
+  CHANNEL_SECRETS_JSON: ${CHANNEL_SECRETS_JSON:?CHANNEL_SECRETS_JSON을 루트 .env에 넣어야 한다}
+  OUTBOUND_SIGNING_SECRET: ${OUTBOUND_SIGNING_SECRET:?OUTBOUND_SIGNING_SECRET을 루트 .env에 넣어야 한다 (32자 이상)}
+  # 시뮬레이터는 같은 컨테이너의 API를 부른다. 시드가 이 주소로 가짜 채널의 수신 주소를 정한다
+  SIMULATOR_TARGET_URL: http://localhost:3000
+  SIMULATOR_FAULTS_JSON: ${SIMULATOR_FAULTS_JSON:-}
+
+services:
+  mariadb:
+    image: mariadb:12.3.3 # LTS. back-end 통합 테스트(Testcontainers)와 같은 버전
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00 # 시각은 UTC로 저장한다 (back-end TypeORM timezone 'Z')
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-restella}
+      MARIADB_USER: ${DB_USER:-restella}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD를 루트 .env에 넣어야 한다 (.env.example 참고)}
+      MARIADB_RANDOM_ROOT_PASSWORD: '1' # root 비밀번호는 쓰지 않는다
+    ports:
+      - '127.0.0.1:${DB_PORT:-3306}:3306' # 내 컴퓨터에서만 접속 (DB 도구, back-end 로컬 실행)
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 5s
+      start_period: 30s
+      retries: 20
+    restart: unless-stopped
+
+  # 마이그레이션과 데모 데이터. 한 번 실행하고 끝난다 (운영의 Argo CD PreSync Job과 같은 역할)
+  # 시드는 다시 실행해도 안전하다 (객실타입·채널·운영자는 덮어쓰고, 재고는 없는 날짜만 넣는다)
+  back-end-migrate:
+    image: restella/back-end:local
+    pull_policy: never # back-end 서비스가 빌드한 이미지를 쓴다
+    command: ['sh', '-c', 'node dist/database/run-migrations.js && node dist/database/seeds/run-seed.js']
+    environment:
+      <<: *back-end-env
+      SEED_OPERATOR_PASSWORD: ${SEED_OPERATOR_PASSWORD:?SEED_OPERATOR_PASSWORD를 루트 .env에 넣어야 한다}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    restart: 'no'
+
+  back-end:
+    build: ./back-end
+    image: restella/back-end:local
+    environment: *back-end-env
+    ports:
+      - '127.0.0.1:${BACK_END_PORT:-3100}:3000' # API: http://localhost:3100, 문서: /api/docs
+    depends_on:
+      back-end-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # 이미지에 curl이 없어 node로 확인한다. ready는 DB 연결까지 본다
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/health/ready').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      start_period: 20s
+      retries: 10
+    restart: unless-stopped
+
+  front-end:
+    build: ./front-end
+    image: restella/front-end:local
+    env_file: ./front-end/.env.local # APP_ENV, SESSION_SECRET (커밋하지 않는다)
+    environment:
+      APP_ENV: local
+      BACKEND_URL: http://back-end:3000 # compose 안에서는 컨테이너 이름으로 부른다 (.env.local의 호스트 주소를 덮어쓴다)
+    ports:
+      - '127.0.0.1:${FRONT_END_PORT:-3200}:3000'
+    depends_on:
+      back-end:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      start_period: 10s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  mariadb-data:
