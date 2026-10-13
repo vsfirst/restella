@@ -2,5 +2,5 @@
 # 레지스트리 주소(AWS 계정 ID 포함)는 공개 저장소에 두지 않는다 (infra/README.md "앱 배포 워크플로")
 image:
   repository: restella-demo/front-end
-  tag: "13bafcedb193ddc82b52e455106dedb699773a76"
-  digest: "sha256:00c35d61ee4d79352a7dc4ae8bc492d36bb26137f2f035afd2f6cedf16c68608"
+  tag: "f5b1417130e6c5ade7ae11092f0463e243f7213e"
+  digest: "sha256:ec0153a184549b94ec17eec1bc278cb1a56d4ebbe78907db061fc81042abb016"
