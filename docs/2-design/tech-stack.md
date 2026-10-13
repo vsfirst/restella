@@ -59,7 +59,7 @@
 | | aws-actions/configure-aws-credentials · amazon-ecr-login | v6.3.0 · v2.1.7 | 최신 |
 | | docker/setup-buildx-action · build-push-action | v4.4.1 · v7.4.0 | 최신 |
 | 비밀값 | AWS Secrets Manager + External Secrets Operator | ESO 2.12 (helm-chart-2.12.0) | 최신 (Kubernetes 1.36 지원) |
-| AWS | demo: 퍼블릭 EC2 1대 + EIP | t4g.large 스팟 (`use_spot`으로 온디맨드 전환) | 비용 ([ADR-0002](../adr/0002-demo-node-os-and-instance.md)) |
+| AWS | demo: 퍼블릭 EC2 1대 + EIP | t4g.large 온디맨드 (2026-10-13 스팟에서 전환. `use_spot`으로 선택) | 비용 ([ADR-0002](../adr/0002-demo-node-os-and-instance.md)) |
 | | prod: ALB + NAT Gateway + 프라이빗 EC2 (설계만. 코드는 아직 작성하지 않았다) | | |
 
 ## 최신 버전을 쓰지 않은 항목

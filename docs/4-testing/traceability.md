@@ -40,5 +40,5 @@
 | NFR-04 개인정보 | 스키마에 이름만 있고 연락처 컬럼이 없다. 시드는 가짜 값 | 스키마·시드 검토 | ✅ (검토) |
 | NFR-05 관측 | `/metrics` (prom-client), kube-prometheus-stack(Prometheus·Grafana), Restella 대시보드(`charts/monitoring-config`) | `auth-and-observability` AC-N05-1, demo Grafana 확인(2026-10-11) | ✅ 지표·대시보드 |
 | NFR-06 배포 | `.github/workflows/demo-*.yaml`이 다이제스트를 `values/demo/*-image.yaml`에 커밋, 차트는 `@sha256:` 참조, Argo CD 자동 동기화(selfHeal) | 2026-10-11 CI 실행과 Argo CD 동기화 | ✅ N06-1 / ⏳ N06-2 (되돌리기) |
-| NFR-07 복구 | 스팟 `persistent`·회수 시 `stop`, DLM 일일 스냅샷 7개 보관 (적용됨) | — | ⏳ N07-1 (스팟 회수 시험) / ⏳ N07-2 (스냅샷 생성 확인) |
+| NFR-07 복구 | 스팟 `persistent`·회수 시 `stop`, DLM 일일 스냅샷 7개 보관 (적용됨) | demo 부팅 기록·CloudTrail(49번 회수 후 자동 복구), 스냅샷 목록(2026-10-13) | ✅ N07-1 / ✅ N07-2 생성 · ⏳ 7개 보관 |
 | NFR-08 날짜 기준 | DATE를 문자열로 다룸(`dateStrings`), 서울 기준 오늘 계산 | `stay-dates.spec.ts` "서버 시간대와 무관" | ✅ |

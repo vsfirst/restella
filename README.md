@@ -23,8 +23,8 @@ flowchart LR
 | 1. 기획 | 문제를 "멀티채널 판매 숙소의 오버부킹"으로 정함. 요구사항과 수치 목표 확정 | 문제 후보 3개(오버부킹, 하우스키핑 상태 불일치, 노쇼) 비교와 추천. 요구사항 28개(기능 20, 품질 8)와 완료 조건 초안 | 진행 중. 문제 정의 보강, 범위 확정, CLAUDE.md 남음 |
 | 2. 디자인 | 화면 설계는 레포 안 HTML 목업으로. 시뮬레이터는 back-end 안 모듈로. 설계 확정 | 도메인 모델·잠금 순서·API 설계. 동시성·중복·동기화·실시간 알림 방식 비교([ADR-0004](docs/adr/0004-reservation-consistency-and-sync.md)). 목업과 스크린샷 10장 | 완료 |
 | 3. 개발 | DTO는 NestJS 관례대로. FSD `entities`·`features` 없애고 `widgets`는 유지. 오류 응답은 RFC 9457 | back-end 모듈 9개, front-end 화면 7개와 BFF, 컨테이너 이미지 | 완료. 코드 리뷰 대기 |
-| 4. 테스트 | 결과 확인 | 불변식 테스트를 먼저 작성. 동시성은 실제 MariaDB로, 시연 시나리오는 실제 브라우저로 검증. 테스트로 문제 12건을 찾아 고침 | 로컬 완료. demo 배포·HTTPS 확인. 부하(p95)·스팟 회수 복구·되돌리기 검증 남음 |
-| 인프라 | demo(실제 배포)와 prod(코드만) 분리. OS는 Amazon Linux 2023(AI는 Ubuntu 추천). t4g.large 스팟. Route 53은 공용 `global` 스택으로. 비밀값은 1개에 `fe`·`be` 키 2개. 워크플로는 앱별로. 노드는 gitops 준비 뒤에 | Terraform(bootstrap·global·demo 모두 적용), 앱별 CI 워크플로(테스트 → arm64 빌드 → ECR → 다이제스트 커밋), Helm 차트 5개(front-end·back-end·mariadb·cluster-config·monitoring-config), Argo CD·ESO·cert-manager 구성과 demo 배포(Let's Encrypt HTTPS), Prometheus·Grafana 모니터링과 Restella 대시보드. 같은 버전의 k3s를 로컬에 띄워 먼저 검증. 결정 기록([ADR-0001~0003, 0005](docs/adr/)) | 진행 중. demo 배포·모니터링 완료. prod 코드 남음 |
+| 4. 테스트 | 결과 확인 | 불변식 테스트를 먼저 작성. 동시성은 실제 MariaDB로, 시연 시나리오는 실제 브라우저로 검증. 테스트로 문제 12건을 찾아 고침 | 로컬 완료. demo 배포·HTTPS 확인. 스팟 회수 후 자동 복구 확인(가동률 71%로 온디맨드 전환). 부하(p95)·되돌리기 검증 남음 |
+| 인프라 | demo(실제 배포)와 prod(코드만) 분리. OS는 Amazon Linux 2023(AI는 Ubuntu 추천). t4g.large 스팟(회수가 잦아 2026-10-13 온디맨드로 전환). Route 53은 공용 `global` 스택으로. 비밀값은 1개에 `fe`·`be` 키 2개. 워크플로는 앱별로. 노드는 gitops 준비 뒤에 | Terraform(bootstrap·global·demo 모두 적용), 앱별 CI 워크플로(테스트 → arm64 빌드 → ECR → 다이제스트 커밋), Helm 차트 5개(front-end·back-end·mariadb·cluster-config·monitoring-config), Argo CD·ESO·cert-manager 구성과 demo 배포(Let's Encrypt HTTPS), Prometheus·Grafana 모니터링과 Restella 대시보드. 같은 버전의 k3s를 로컬에 띄워 먼저 검증. 결정 기록([ADR-0001~0003, 0005](docs/adr/)) | 진행 중. demo 배포·모니터링 완료. prod 코드 남음 |
 
 ### AI 결과를 검증한 방법
 
@@ -292,7 +292,7 @@ flowchart LR
 
 ### 검증 결과
 
-로컬 환경(시뮬레이션·화면 2026-10-10, 자동 테스트 재실행 2026-10-11)과 demo 환경(2026-10-11 배포)에서 확인한 결과다. demo의 부하(p95)·스팟 회수 복구·되돌리기 검증은 남았다. 직접 써 보는 방법은 [demo 사용 안내](DEMO.md)에 있다.
+로컬 환경(시뮬레이션·화면 2026-10-10, 자동 테스트 재실행 2026-10-11)과 demo 환경(2026-10-11 배포)에서 확인한 결과다. demo는 2026-10-13에 다시 점검해 스팟 회수 후 자동 복구를 확인했고, 회수가 잦아 온디맨드로 바꿨다. 부하(p95)·되돌리기 검증은 남았다. 직접 써 보는 방법은 [demo 사용 안내](DEMO.md)에 있다.
 
 | 확인 항목 | 결과 |
 |---|---|

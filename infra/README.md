@@ -25,7 +25,8 @@ Restella를 AWS EC2 위의 k3s 클러스터에 배포하는 인프라 코드다.
 **공통**
 - 리전은 서울(`ap-northeast-2`), VPC 대역은 `10.0.0.0/16`이다.
 - EC2는 Amazon Linux 2023(arm64, 커널 6.18)이고 k3s 단일 노드로 운영한다. prod는 노드 수를 변수로 둘 계획이다(현재 k3s-node 모듈은 노드 1대만 만든다).
-- demo 노드는 t4g.large 스팟이다. 회수되면 중지되고 다시 켜지도록 설정했다(회수 후 복구는 아직 시험하지 않았다). 꺼지면 안 되는 기간에는 `use_spot = false`로 온디맨드로 바꾼다.
+- demo 노드는 t4g.large다. 처음에는 스팟으로 운영했지만 회수가 잦아(2026-10-11~13 약 55시간에 49번, 가동률 71%) 2026-10-13부터 **온디맨드**로 운영한다(사람 결정). 스팟 회수 뒤에는 매번 사람 개입 없이 복구됐다([demo 운영 확인](#demo-운영-확인-2026-10-13)).
+- 구매 방식(`use_spot`)은 실행 중에 바꿀 수 없어 노드를 교체해야 한다. `use_spot`만 바꾸면 plan에 아무 변경도 나오지 않는다. 실제로 전환한 절차와 영향은 [노드 교체](#노드-교체)에 있다.
 - SSH 포트는 열지 않고 SSM Session Manager로 접속한다.
 - Kubernetes API(6443)는 외부에 노출하지 않는다.
 - 도메인은 Route 53 호스팅 영역을 쓴다. demo는 Let's Encrypt, prod는 ACM이 도메인 소유를 확인해 인증서를 발급한다.
@@ -70,12 +71,12 @@ infra/
 
 | 항목 | 설정 |
 |---|---|
-| 인스턴스 | t4g.large, 스팟(`persistent` 요청, 회수 시 `stop`), CPU 크레딧 `standard` |
+| 인스턴스 | t4g.large 온디맨드(2026-10-13부터. `use_spot = true`면 스팟 `persistent` 요청, 회수 시 `stop`), CPU 크레딧 `standard` |
 | AMI | SSM 공개 파라미터 `al2023-ami-kernel-6.18-arm64`. 새 AMI가 나와도 운영 중인 노드는 교체하지 않는다(`ignore_changes`) |
 | 디스크 | 루트 gp3 20GiB와 데이터 gp3 10GiB, 모두 암호화. 데이터 볼륨은 인스턴스와 수명을 분리해 k3s 로컬 볼륨 경로(`/var/lib/rancher/k3s/storage`)에 마운트한다 |
 | 백업 | Data Lifecycle Manager가 데이터 볼륨을 매일 KST 03:00에 스냅샷하고 7개를 보관한다 |
 | 접속 | SSM Session Manager만 쓴다. SSH 키와 22번 포트는 없다 |
-| IMDS | IMDSv2만 허용한다. 모듈 기본 홉 제한은 1(Pod가 인스턴스 역할에 접근 불가)이고, demo는 External Secrets Operator를 위해 2로 올린다. 대신 cluster-config가 지정한 네임스페이스(restella, argocd, kube-system, cert-manager, monitoring)마다 NetworkPolicy로 메타데이터 주소를 막는다. 새 네임스페이스는 직접 추가해야 한다([ADR-0005 결정 3](../docs/adr/0005-cluster-bootstrap.md#결정-3-인스턴스-메타데이터는-네임스페이스마다-networkpolicy로-막는다). 실제 노드에서 차단 확인은 남음) |
+| IMDS | IMDSv2만 허용한다. 모듈 기본 홉 제한은 1(Pod가 인스턴스 역할에 접근 불가)이고, demo는 External Secrets Operator를 위해 2로 올린다. 대신 cluster-config가 지정한 네임스페이스(restella, argocd, kube-system, cert-manager, monitoring)마다 NetworkPolicy로 메타데이터 주소를 막는다. 새 네임스페이스는 직접 추가해야 한다([ADR-0005 결정 3](../docs/adr/0005-cluster-bootstrap.md#결정-3-인스턴스-메타데이터는-네임스페이스마다-networkpolicy로-막는다). demo 노드에서 back-end Pod의 메타데이터 접근이 막히는 것을 확인했다, 2026-10-13) |
 | k3s | 버전 고정(`v1.36.5+k3s1`), Secret 저장 시 암호화(`secrets-encryption`), kubeconfig 권한 0600 |
 | 로그 | 루트 볼륨이 넘치지 않게 상한을 두고, 넘으면 오래된 로그부터 지운다. OS·k3s 로그(journald, AL2023은 rsyslog 없음)는 500MB·14일, 컨테이너 로그는 kubelet이 10Mi × 3개, k3s 내장 containerd 로그(`/var/lib/rancher/k3s/agent/containerd/containerd.log`)는 k3s가 50MB × 3개·28일로 로테이션한다(k3s 코드에 고정). 앞의 둘은 노드가 생길 때 user-data로 설정하므로, 바꾸려면 노드를 교체하거나 SSM으로 직접 고친다 |
 | DNS | 호스팅 영역 이름과 그 하위 이름 전체(`*.`)를 노드의 EIP로 보낸다. 영역 자체는 `global`이 관리한다 |
@@ -422,7 +423,42 @@ terraform -chdir=infra/terraform/envs/demo output -raw github_actions_role_arn |
 3. **Argo CD 순환 대기:** `argocd-bootstrap`과 루트가 서로를 기다려 멈췄다([ADR-0005 결정 1](../docs/adr/0005-cluster-bootstrap.md#결정-1-argo-cd는-k3s-내장-helmchart로-설치하고-그-뒤로는-argo-cd가-스스로-관리한다)). Git을 고친 뒤, 노드에서 새 `argocd-bootstrap` 정의를 직접 적용하고 `root-demo`의 `argocd.argoproj.io/tracking-id` annotation을 지워 풀었다.
 4. **cluster-config 첫 동기화:** ESO webhook이 준비되기 전이라 실패했고, 재시도로 저절로 회복했다.
 
-**아직 하지 않은 것:** prod 코드, 실제 노드의 메타데이터 차단 확인, 스팟 회수 복구 시험, p95 부하 테스트.
+**아직 하지 않은 것:** prod 코드, p95 부하 테스트, 이전 커밋으로 되돌리기.
+
+## demo 운영 확인 (2026-10-13)
+
+배포 이틀 뒤 읽기 전용으로 점검했다(`terraform plan`, AWS CLI, SSM으로 노드에서 `kubectl` 조회, 외부 HTTPS 요청).
+
+| 항목 | 결과 |
+|---|---|
+| Terraform | bootstrap·global·envs/demo 모두 plan "변경 없음". 실제 리소스가 코드와 같다 |
+| Argo CD | Application 9개(루트 포함) 모두 Synced/Healthy, 최신 커밋 반영 |
+| Pod | 실패한 Pod 없음. ExternalSecret 5개 동기화, 인증서 3개(`fe.`·`api.`·`grafana.`) Ready |
+| 외부 접속 | `fe.`는 로그인으로 이동, `/api/health` 정상. `api.`는 채널 API와 API 문서만 공개하고 `/metrics`·운영자 API는 404. HTTP는 301로 HTTPS 이동 |
+| 메타데이터 차단 | back-end Pod에서 `169.254.169.254` 접근이 막힌다 |
+| 스냅샷 | 데이터 볼륨 스냅샷이 매일 KST 03시 무렵 만들어진다(10-12, 10-13 두 개. 7개 보관은 아직 확인 못 함) |
+| 리소스 | 메모리 7.6GiB 중 3.4GiB 사용, 루트 디스크 43%, 데이터 디스크 12% |
+
+**스팟 회수가 잦다.** 모든 Pod의 재시작 횟수가 약 48인데 노드 가동 시간은 2시간 반이었다. 부팅 기록과 CloudTrail(`StopInstances`, 호출자 `InstanceTermination`)로 AWS의 스팟 회수임을 확인했다.
+- 약 55시간 동안 49번 회수됐다. 한 번에 평균 45분 켜져 있다가 평균 20분(최대 91분) 꺼졌다. 가동률 71%다.
+- 매번 사람 개입 없이 k3s, Argo CD, 앱이 다시 올라왔고 DB 볼륨(PVC)도 그대로다(AC-N07-1).
+- 노드가 있는 `ap-northeast-2d`는 조회 시점에 t4g.large 스팟 가격이 가장 낮은 곳이다. 가격이 낮다고 회수가 적은 것은 아니다.
+
+**`use_spot = false`만으로는 아무것도 바뀌지 않는다.** plan이 "변경 없음"이었다. provider가 `instance_market_options`를 계산하는 값으로 다뤄, 블록이 사라져도 차이로 보지 않는다. 실행 중인 인스턴스의 구매 방식은 바꿀 수 없으므로 전환하려면 노드를 교체해야 한다. 모듈에 이를 막는 검사(postcondition)를 넣는 안도 plan으로 확인했지만 코드는 바꾸지 않았다(사람 결정).
+
+### 노드 교체
+
+2026-10-13에 스팟에서 온디맨드로 바꾸며 노드를 교체했다. 실제로 거친 순서는 다음과 같다.
+1. persistent 스팟 요청을 먼저 취소했다. 인스턴스만 지우면 요청이 다시 열려 스팟 인스턴스가 또 뜰 수 있어서다.
+2. `terraform apply -var use_spot=false -replace=module.k3s_node.aws_instance.node`는 실패했다. 데이터 볼륨을 떼기 전에 인스턴스를 중지하는데(`stop_instance_before_detaching`), 요청이 취소된 스팟 인스턴스는 AWS가 중지를 거부한다(`IncorrectSpotRequestState`). 그 사이 인스턴스는 스팟 회수로 이미 중지돼 있었고, 요청이 취소돼 다시 켤 수도 없었다.
+3. 중지된 인스턴스를 직접 종료했다(데이터 볼륨은 `DeleteOnTermination = false`라 남는다). 그 뒤 `use_spot = false`로 `terraform apply`하니 인스턴스 생성, 볼륨 연결, EIP 연결만 하고 삭제는 없었다.
+4. `scripts/bootstrap-demo-argocd.sh`를 다시 실행했다. 약 25분 뒤 Application 9개 Synced/Healthy, 인증서 3개 발급, 외부 접속 정상.
+
+다음에 같은 전환을 한다면 스팟 요청을 취소하기 전에 인스턴스를 먼저 중지하거나, 1~3 대신 처음부터 종료 → apply 순서로 한다(시험하지 않음). 교체하면 다음이 일어난다.
+- k3s의 클러스터 상태는 루트 볼륨에 있어 **새 클러스터**가 된다. `scripts/bootstrap-demo-argocd.sh`를 다시 실행해야 Argo CD가 나머지를 배포한다.
+- 데이터 볼륨과 EIP(공인 IP)는 남는다. 다만 새 클러스터는 PVC를 새로 만들므로 DB는 빈 상태에서 마이그레이션·시드로 다시 시작한다(이전 데이터 디렉토리는 볼륨에 남는다).
+- Grafana 관리자 비밀번호처럼 클러스터 안에서 만든 값도 새로 생긴다.
+- 인증서는 cert-manager가 다시 발급받는다.
 
 ## 운영 원칙
 
