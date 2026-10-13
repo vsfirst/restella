@@ -114,11 +114,16 @@ Testcontainers로 운영과 같은 MariaDB 12.3.3을 띄우고, 앱을 실제 �
 
 ## 관측
 
-- `/metrics`로 Prometheus 지표를 낸다(수집하는 Prometheus와 대시보드는 아직 배포하지 않았다).
+- `/metrics`로 Prometheus 지표를 낸다. demo에서는 Prometheus가 수집하고 Grafana 대시보드에서 본다.
   - `restella_reservations_total{result}`: 예약 확정·거절·충돌·중복 건수
   - `restella_sync_latency_seconds`: 채널 동기화 지연
   - `restella_sync_failures_total`: 동기화 실패
   - `restella_http_request_duration_seconds`: API 응답 시간
+- **요청 로그**(`common/http/request-log.ts`): 요청마다 한 줄을 남긴다. 예: `POST /api/v1/reservations/7/cancel 200 12.3ms requestId=…`
+  - 4xx는 WARN, 5xx는 ERROR로 남긴다. 응답 전에 연결이 닫히면(SSE 구독 종료 등) 상태 뒤에 `closed`를 붙인다.
+  - 개인정보가 섞이지 않게 쿼리 문자열, 본문, 접속자 IP는 남기지 않는다.
+  - 주기적으로 불리는 `/health/*`와 `/metrics`는 남기지 않는다.
+  - demo에서는 Alloy가 이 로그를 Loki로 보내고 Grafana에서 `requestId`로 찾는다.
 - `/health/live`, `/health/ready`(DB 연결)를 Kubernetes 프로브에 연결한다.
 - `/metrics`와 `/health/*`는 Ingress에 노출하지 않는다.
 

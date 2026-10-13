@@ -366,7 +366,7 @@
       "id": 9,
       "type": "logs",
       "title": "back-end 경고·오류 로그",
-      "description": "restella 네임스페이스의 back-end 로그 중 WARN·ERROR. 500 오류는 requestId로 화면의 오류 메시지와 이어 찾는다",
+      "description": "restella 네임스페이스의 back-end 로그 중 WARN·ERROR (4xx·5xx 요청 포함). 500 오류는 requestId로 화면의 오류 메시지와 이어 찾는다",
       "gridPos": {
         "x": 0,
         "y": 20,

@@ -9,7 +9,7 @@
 | 채널 API | `/api/v1/channel/*` | 채널(데모에서는 시뮬레이터) | 채널별 HMAC 서명 | `api.<도메인>`으로 공개 |
 | 운영자 API | `/api/v1/*` (채널 API 제외) | front-end BFF만 | 운영자 토큰(JWT) | **비공개.** 클러스터 안에서만 접근한다 |
 | API 문서 | `/api/docs`, `/api/docs-json` | 심사자 | 없음 | `api.<도메인>`으로 공개 |
-| 상태 확인·지표 | `/health/*`, `/metrics` | Kubernetes 프로브 (지표 수집기는 아직 배포하지 않음) | 없음 | **비공개** |
+| 상태 확인·지표 | `/health/*`, `/metrics` | Kubernetes 프로브, Prometheus 수집 | 없음 | **비공개** |
 | 시뮬레이터 수신 | `/internal/simulator/*` | Restella 동기화 발송기 | Restella HMAC 서명 (POST만. 상태 조회 `GET`은 서명 없음, 테스트·디버깅용) | **비공개** |
 
 운영자 API는 Ingress에 노출하지 않는다. 그래도 JWT 검사는 그대로 한다. 네트워크 경계와 인증을 겹쳐 두는 것이다.
@@ -32,7 +32,7 @@
 | 본문 없음 | 204 |
 | 실패 | [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json` |
 
-**모든 응답에 `X-Request-Id` 헤더가 붙는다.** 앞단(BFF)이 형식에 맞는 값(영문·숫자·`._-` 8~64자)을 보내면 이어 쓰고, 아니면 back-end가 새로 만든다. 오류 본문의 `requestId`와 같은 값이라, 오류가 나면 이 값으로 back-end 로그(`kubectl logs`)를 찾는다.
+**모든 응답에 `X-Request-Id` 헤더가 붙는다.** 앞단(BFF)이 형식에 맞는 값(영문·숫자·`._-` 8~64자)을 보내면 이어 쓰고, 아니면 back-end가 새로 만든다. 오류 본문의 `requestId`와 같은 값이다. back-end는 요청마다 이 값을 넣은 요청 로그를 남기므로, 오류가 나면 이 값으로 로그(demo는 Grafana의 Loki, 로컬은 `docker logs`)를 찾는다.
 
 ```json
 {

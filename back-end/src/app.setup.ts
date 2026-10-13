@@ -2,11 +2,13 @@ import { type INestApplication, ValidationPipe, type ValidationError } from '@ne
 import { problem } from './common/http/problem.js';
 import type { FieldError } from './common/http/problems.js';
 import { requestId } from './common/http/request-id.js';
+import { requestLog } from './common/http/request-log.js';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 /** main.ts와 테스트가 같은 설정을 쓰도록 한곳에 모은다 */
 export function configureApp(app: INestApplication): INestApplication {
   app.use(requestId);
+  app.use(requestLog);
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
