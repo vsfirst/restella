@@ -83,7 +83,7 @@ export function ReservationBoard({ filters, cursor, page, channels, selected }: 
                 <td className="px-4 py-3 whitespace-nowrap">{formatStay(r.checkIn, r.checkOut)}</td>
                 <td className="px-4 py-3">{r.guestName}</td>
                 <td className="px-4 py-3">
-                  <ReservationStatusBadge status={r.status} />
+                  <ReservationStatusBadge status={r.status} conflictStatus={r.conflictStatus} />
                 </td>
                 <td className="px-4 py-3 font-mono text-xs whitespace-nowrap text-slate-500">{formatDateTime(r.createdAt)}</td>
               </tr>

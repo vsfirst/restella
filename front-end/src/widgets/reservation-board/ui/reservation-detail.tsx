@@ -14,7 +14,7 @@ export function ReservationDetailView({ reservation: r }: { reservation: Reserva
     <>
       <dl className="mt-5 space-y-3 text-sm">
         <Row label="상태">
-          <ReservationStatusBadge status={r.status} />
+          <ReservationStatusBadge status={r.status} conflictStatus={r.conflictStatus} />
         </Row>
         <Row label="채널">
           <ChannelBadge name={r.channelName} type={r.channelType} />

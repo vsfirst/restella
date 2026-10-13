@@ -17,7 +17,9 @@ export function useCancelReservationController(reservation: ReservationDetail) {
     description:
       reservation.status === 'CONFIRMED'
         ? `취소하면 ${reservation.nights.length}박(${nights})의 재고가 1씩 복원되고, 모든 채널에 남은 재고가 전송됩니다.`
-        : '충돌 예약은 재고를 차감하지 않았으므로 재고는 그대로이고, 충돌도 취소로 닫힙니다.',
+        : reservation.conflictStatus === 'RESOLVED'
+          ? '충돌 예약은 재고를 차감하지 않았으므로 재고는 그대로입니다. 충돌은 이미 해결됨으로 처리되어 그대로 남습니다.'
+          : '충돌 예약은 재고를 차감하지 않았으므로 재고는 그대로이고, 충돌도 취소로 닫힙니다.',
     pending: mutation.isPending,
     error: mutation.error ? errorMessage(mutation.error) : null,
     cancel: () => {

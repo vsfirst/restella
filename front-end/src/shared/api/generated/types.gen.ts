@@ -164,6 +164,10 @@ export type ReservationResponseDto = {
      */
     initialResult: 'CONFIRMED' | 'REJECTED' | 'CONFLICT';
     channelType: 'CONFIRM' | 'NOTIFY';
+    /**
+     * 충돌로 기록된 예약이면 그 충돌의 처리 상태. 충돌이 없었으면 null
+     */
+    conflictStatus: 'OPEN' | 'CANCELLED' | 'RESOLVED' | 'MOVED' | null;
     id: number;
     channelReservationNo: string;
     /**
@@ -213,6 +217,10 @@ export type ReservationDetailResponseDto = {
      */
     initialResult: 'CONFIRMED' | 'REJECTED' | 'CONFLICT';
     channelType: 'CONFIRM' | 'NOTIFY';
+    /**
+     * 충돌로 기록된 예약이면 그 충돌의 처리 상태. 충돌이 없었으면 null
+     */
+    conflictStatus: 'OPEN' | 'CANCELLED' | 'RESOLVED' | 'MOVED' | null;
     id: number;
     channelReservationNo: string;
     /**

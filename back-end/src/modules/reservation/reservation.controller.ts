@@ -6,6 +6,7 @@ import { CurrentOperator } from '../../common/auth/current-operator.decorator.js
 import type { OperatorPrincipal } from '../../common/auth/operator-auth.guard.js';
 import { enumerateNights } from '../../common/time/stay-dates.js';
 import type { ChannelType } from '../channel/channel.entity.js';
+import type { ConflictStatus } from '../conflict/conflict.entity.js';
 import type { EventType } from '../event-log/event-log.entity.js';
 import { ListReservationsQueryDto } from './dto/list-reservations-query.dto.js';
 import {
@@ -23,10 +24,12 @@ const SELECT = `
          r.guest_name AS guestName, r.status, r.initial_result AS initialResult, r.created_at AS createdAt,
          r.cancelled_at AS cancelledAt,
          c.id AS channelId, c.code AS channelCode, c.name AS channelName, c.type AS channelType,
-         rt.id AS roomTypeId, rt.code AS roomTypeCode, rt.name AS roomTypeName
+         rt.id AS roomTypeId, rt.code AS roomTypeCode, rt.name AS roomTypeName,
+         cf.status AS conflictStatus
     FROM reservation r
     JOIN channel c ON c.id = r.channel_id
-    JOIN room_type rt ON rt.id = r.room_type_id`;
+    JOIN room_type rt ON rt.id = r.room_type_id
+    LEFT JOIN conflict cf ON cf.reservation_id = r.id`;
 
 interface ReservationRow {
   id: number | string;
@@ -45,6 +48,7 @@ interface ReservationRow {
   roomTypeId: number | string;
   roomTypeCode: string;
   roomTypeName: string;
+  conflictStatus: ConflictStatus | null;
 }
 
 interface HistoryRow {
@@ -72,6 +76,7 @@ const toReservationResponse = (r: ReservationRow): ReservationResponseDto => ({
   roomTypeId: Number(r.roomTypeId),
   roomTypeCode: r.roomTypeCode,
   roomTypeName: r.roomTypeName,
+  conflictStatus: r.conflictStatus,
 });
 
 @ApiTags('reservations')

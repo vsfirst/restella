@@ -161,7 +161,7 @@ Restella가 채널에 보내는 요청의 계약이다. 실제 OTA 대신 back-e
 | `GET /api/v1/inventory?from=&to=` | 재고 달력. 객실타입 × 날짜마다 총 재고, 판매 수, 남은 재고. 기간은 최대 31일이다 | REQ-02 |
 | `PATCH /api/v1/inventory/{roomTypeId}/{stayDate}` | `{ totalRooms, source? }`로 총 재고를 조정한다. 판매 수보다 작으면 409. `source`는 이벤트 로그에 남길 출처(예: `SIMULATOR:12`) | REQ-03 |
 | `GET /api/v1/reservations?channelId=&status=&from=&to=` | 예약 목록 | REQ-16 |
-| `GET /api/v1/reservations/{id}` | 예약 상세 | REQ-16 |
+| `GET /api/v1/reservations/{id}` | 예약 상세. 목록과 같이 `conflictStatus`(충돌 처리 상태, 없으면 `null`)를 준다 | REQ-16 |
 | `POST /api/v1/reservations/{id}/cancel` | 운영자 취소 | REQ-10 |
 | `GET /api/v1/conflicts?status=OPEN` | 충돌 처리함 | REQ-13 |
 | `POST /api/v1/conflicts/{id}/cancel` | 충돌을 취소로 처리하고 채널에 전달 | REQ-14 |

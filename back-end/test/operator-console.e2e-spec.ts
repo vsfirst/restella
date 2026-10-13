@@ -92,6 +92,9 @@ describe('REQ-13, 14, 15 충돌 처리', () => {
     expect(ok.status).toBe(200);
     const [row] = await ctx.ds.query('SELECT status, resolution_note FROM conflict WHERE id = ?', [c.id]);
     expect(row).toMatchObject({ status: 'RESOLVED', resolution_note: '인근 제휴 숙소로 안내' });
+    // 예약은 CONFLICT로 남고, 화면이 처리 여부를 알 수 있게 충돌 상태를 함께 준다
+    const detail = await api('GET', `/api/v1/reservations/${c.reservationId}`);
+    expect(detail.body).toMatchObject({ status: 'CONFLICT', conflictStatus: 'RESOLVED' });
   });
 
   it('AC-14-3: 처리된 충돌은 미처리 목록에서 빠지고 이벤트 로그에 남는다', async () => {
@@ -110,7 +113,7 @@ describe('REQ-13, 14, 15 충돌 처리', () => {
     const [std] = await nights(ctx, 'STD-TWN', '2026-10-10', '2026-10-10');
     expect(std.sold_rooms).toBe(1);
     const detail = await api('GET', `/api/v1/reservations/${c.reservationId}`);
-    expect(detail.body).toMatchObject({ status: 'CONFIRMED', roomTypeCode: 'STD-TWN' });
+    expect(detail.body).toMatchObject({ status: 'CONFIRMED', roomTypeCode: 'STD-TWN', conflictStatus: 'MOVED' });
   });
 });
 

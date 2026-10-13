@@ -177,7 +177,7 @@ stateDiagram-v2
   CANCELLED --> [*]
 ```
 
-충돌을 "해결됨"으로 처리하면 예약은 `CONFLICT` 상태로 남고, `conflict.status`만 `RESOLVED`가 된다. 예약이 숙소 밖에서 해결되었다는 기록이다.
+충돌을 "해결됨"으로 처리하면 예약은 `CONFLICT` 상태로 남고, `conflict.status`만 `RESOLVED`가 된다. 예약이 숙소 밖에서 해결되었다는 기록이다. 그래서 예약 목록·상세 응답은 `conflictStatus`(충돌이 없었으면 `null`)를 함께 주고, 화면은 "충돌 · 해결됨"처럼 처리 상태를 붙여 미처리 충돌과 구분한다.
 
 ### conflict: 오버부킹 충돌 (REQ-07, 13, 14, 15)
 

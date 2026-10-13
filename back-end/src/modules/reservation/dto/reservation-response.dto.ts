@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CHANNEL_TYPES, type ChannelType } from '../../channel/channel.entity.js';
+import { CONFLICT_STATUSES, type ConflictStatus } from '../../conflict/conflict.entity.js';
 import { EVENT_TYPES, type EventType } from '../../event-log/event-log.entity.js';
 import {
   RECEIVE_RESULTS,
@@ -40,6 +41,11 @@ export class ReservationResponseDto {
   roomTypeId: number;
   roomTypeCode: string;
   roomTypeName: string;
+
+  /** 충돌로 기록된 예약이면 그 충돌의 처리 상태. 충돌이 없었으면 null */
+  // OpenAPI 3.0에서 nullable enum은 enum 목록에 null이 있어야 생성 타입에 null이 들어간다
+  @ApiProperty({ enum: [...CONFLICT_STATUSES, null], nullable: true })
+  conflictStatus: ConflictStatus | null;
 }
 
 export class ReservationListResponseDto {

@@ -1,6 +1,6 @@
-import type { ChannelType, EventType, ReservationStatus } from '../api/types';
+import type { ChannelType, ConflictStatus, EventType, ReservationStatus } from '../api/types';
 import { cn } from '../lib/cn';
-import { CHANNEL_TYPE_LABEL, EVENT_TYPE_LABEL, RESERVATION_STATUS_LABEL } from '../lib/labels';
+import { CHANNEL_TYPE_LABEL, CONFLICT_STATUS_LABEL, EVENT_TYPE_LABEL, RESERVATION_STATUS_LABEL } from '../lib/labels';
 
 /** 채널 이름과 유형(확인형/통보형) */
 export function ChannelBadge({ name, type }: { name: string; type: ChannelType }) {
@@ -27,10 +27,20 @@ const RESERVATION_STATUS_STYLE: Record<ReservationStatus, string> = {
   CANCELLED: 'bg-white text-slate-500 ring-slate-200 line-through',
 };
 
-export function ReservationStatusBadge({ status }: { status: ReservationStatus }) {
+/**
+ * 예약 상태. "해결됨"으로 처리한 충돌은 예약이 CONFLICT로 남으므로, 충돌 처리 상태를 붙여 미처리와 구분한다
+ */
+export function ReservationStatusBadge({ status, conflictStatus }: { status: ReservationStatus; conflictStatus?: ConflictStatus | null }) {
+  const handled = status === 'CONFLICT' && conflictStatus != null && conflictStatus !== 'OPEN';
   return (
-    <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ring-1', RESERVATION_STATUS_STYLE[status])}>
+    <span
+      className={cn(
+        'whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ring-1',
+        handled ? 'bg-slate-50 text-slate-600 ring-slate-200' : RESERVATION_STATUS_STYLE[status],
+      )}
+    >
       {RESERVATION_STATUS_LABEL[status]}
+      {handled && ` · ${CONFLICT_STATUS_LABEL[conflictStatus]}`}
     </span>
   );
 }
