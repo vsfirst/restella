@@ -51,6 +51,8 @@
 | 관측 | kube-prometheus-stack | 92.3.0 | 최신 |
 | | Prometheus | 3.13.4 | LTS (2027-07 지원 종료). 차트 기본값(3.15) 대신 이미지 태그를 고정했다 |
 | | Grafana | grafana 차트 13.5.0 (kube-prometheus-stack 포함) | 최신 (차트 기본값) |
+| | Loki | 3.7.8 (grafana-community/loki 차트 18.15.1) | 최신. LTS 없음. 오픈소스 차트는 grafana-community로 옮겨졌다 |
+| | Alloy | 1.20.1 (grafana/alloy 차트 1.13.1) | 최신. LTS 없음 |
 | 보안 | gitleaks (커밋 전 비밀값 검사) | 8.30.1 | 최신 |
 | CI / 이미지 저장소 | GitHub Actions / Amazon ECR | — | 사람 결정 ([ADR-0003](../adr/0003-delivery-pipeline.md)) |
 | | GitHub Actions 러너 | ubuntu-24.04, ubuntu-24.04-arm | 이미지는 arm64 러너에서 네이티브 빌드 |

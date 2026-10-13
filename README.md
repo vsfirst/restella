@@ -336,7 +336,7 @@ flowchart LR
     FE -->|REST + 액세스 토큰| CORE
     CORE --> DB
     ING -->|"api.&lt;도메인&gt;<br/>채널 API · 문서"| CORE
-    PROM["Prometheus · Grafana"] -. 지표 수집 .-> CORE
+    PROM["Prometheus · Loki · Grafana"] -. 지표·로그 수집 .-> CORE
     ING -->|"grafana.&lt;도메인&gt;<br/>읽기 전용"| PROM
     ARGO[Argo CD]
   end
@@ -353,7 +353,7 @@ flowchart LR
 | front-end | 운영자 콘솔. 세션을 보관하고 back-end API를 대신 호출하는 BFF | Next.js, iron-session, TanStack Query, Tailwind CSS, FSD |
 | back-end | 재고 원장, 예약 수신·취소, 채널 동기화, 충돌 관리. 채널을 흉내 내는 `simulator` 모듈도 이 앱 안에 있다 | NestJS, TypeORM, Swagger |
 | DB | 재고, 예약, 충돌, 이벤트 저장 | MariaDB |
-| infra | EC2 1대 위의 k3s 클러스터, GitOps 배포, HTTPS, 모니터링 | Terraform, k3s, Helm, Argo CD, cert-manager, Traefik, Prometheus, Grafana |
+| infra | EC2 1대 위의 k3s 클러스터, GitOps 배포, HTTPS, 모니터링 | Terraform, k3s, Helm, Argo CD, cert-manager, Traefik, Prometheus, Loki, Alloy, Grafana |
 | CI | 테스트, 이미지 빌드·푸시, 이미지 다이제스트를 gitops에 반영 | GitHub Actions, ECR |
 | 비밀값 | DB 비밀번호, 세션 키 등을 클러스터에 전달 | AWS Secrets Manager, External Secrets Operator |
 

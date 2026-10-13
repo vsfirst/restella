@@ -1,4 +1,4 @@
-# demo 모니터링 (kube-prometheus-stack 92.3.0). Prometheus가 back-end /metrics와 클러스터 지표를 모으고 Grafana로 본다.
+# demo 모니터링 (kube-prometheus-stack 92.3.0). Prometheus가 back-end /metrics와 클러스터 지표를 모으고 Grafana로 본다. 로그는 Loki에서 읽는다.
 # grafana.ingress의 호스트(grafana.<도메인>)와 root_url은 ApplicationSet이 클러스터 Secret annotation에서 넣는다
 
 # Alertmanager는 받을 곳(메일·슬랙)이 없어 끈다
@@ -44,6 +44,13 @@ prometheusOperator:
 
 grafana:
   defaultDashboardsTimezone: Asia/Seoul
+  # 로그 (Loki, apps/demo/loki.yaml). Prometheus 데이터 소스는 차트가 만든다
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      uid: loki
+      url: http://loki.monitoring.svc.cluster.local:3100
+      access: proxy
   # 관리자 비밀번호는 monitoring-config 차트가 ESO 생성기로 한 번 만든다 (기본값 prom-operator를 쓰지 않는다)
   admin:
     existingSecret: grafana-admin

@@ -361,7 +361,73 @@
           "legendFormat": "{{route}}"
         }
       ]
+    },
+    {
+      "id": 9,
+      "type": "logs",
+      "title": "back-end 경고·오류 로그",
+      "description": "restella 네임스페이스의 back-end 로그 중 WARN·ERROR. 500 오류는 requestId로 화면의 오류 메시지와 이어 찾는다",
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{namespace=\"restella\", app=\"back-end\"} |~ \"(WARN|ERROR)\""
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "logs",
+      "title": "restella 전체 로그",
+      "description": "restella 네임스페이스의 모든 컨테이너 로그(back-end, front-end, MariaDB, 마이그레이션 Job)",
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{namespace=\"restella\"}"
+        }
+      ]
     }
   ],
-  "description": "오버부킹 대응 지표: 예약 결과, 충돌, 채널 동기화 지연·실패, API 응답 시간"
+  "description": "오버부킹 대응 지표: 예약 결과, 충돌, 채널 동기화 지연·실패, API 응답 시간, 앱 로그"
 }

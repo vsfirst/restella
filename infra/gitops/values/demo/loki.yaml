@@ -1,0 +1,57 @@
+# demo 로그 저장소 (grafana-community/loki 18.15.1, Loki 3.7.8).
+# 노드 한 대라 단일 바이너리(Monolithic)로 띄우고, 로그는 데이터 EBS의 PVC(파일시스템)에 둔다. 객체 저장소(S3)는 쓰지 않는다.
+# 로그는 Alloy가 넣고(values/demo/alloy.yaml), Grafana가 읽는다. 들어오는 연결은 monitoring-config의 NetworkPolicy가 제한한다
+deploymentMode: Monolithic
+
+loki:
+  # 테넌트를 나누지 않는다. 클러스터 밖에 열지 않는다(Ingress 없음)
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+  schemaConfig:
+    configs:
+      - from: "2026-10-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  # 7일이 지난 로그는 compactor가 지운다. 데이터 EBS(10GiB)를 MariaDB·Prometheus와 나눠 쓴다
+  limits_config:
+    retention_period: 168h
+  compactor:
+    retention_enabled: true
+    delete_request_store: filesystem
+  pattern_ingester:
+    enabled: false
+  ui:
+    enabled: false
+
+singleBinary:
+  replicas: 1
+  persistence:
+    size: 3Gi
+  resources:
+    requests: { cpu: 50m, memory: 192Mi }
+    limits: { memory: 512Mi }
+
+# 단일 바이너리에 필요 없는 구성 요소는 끈다
+read: { replicas: 0 }
+write: { replicas: 0 }
+backend: { replicas: 0 }
+gateway:
+  enabled: false
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+lokiCanary:
+  enabled: false
+test:
+  enabled: false
+sidecar:
+  rules:
+    enabled: false

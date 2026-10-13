@@ -2,7 +2,7 @@
 
 Restella를 AWS EC2 위의 k3s 클러스터에 배포하는 인프라 코드다. AWS 리소스는 Terraform으로, 클러스터 안의 구성은 Argo CD 기반 GitOps로 관리한다.
 
-- 기술: Terraform, k3s, Helm, Argo CD, External Secrets Operator, cert-manager, Prometheus·Grafana(kube-prometheus-stack)
+- 기술: Terraform, k3s, Helm, Argo CD, External Secrets Operator, cert-manager, Prometheus·Grafana(kube-prometheus-stack), Loki·Alloy(로그)
 - 버전: [기술 스택](../docs/2-design/tech-stack.md)
 - 네트워크 구성 결정: [ADR-0001](../docs/adr/0001-network-topology.md)
 - demo 노드의 OS와 인스턴스 결정: [ADR-0002](../docs/adr/0002-demo-node-os-and-instance.md)
@@ -53,7 +53,7 @@ infra/
 └── gitops/                 # Argo CD가 감시하는 디렉토리
     ├── bootstrap/          # Argo CD 설치 정의(k3s HelmChart)와 환경별 루트 Application (스크립트만 적용)
     ├── apps/
-    │   ├── demo/           # argocd-bootstrap, external-secrets, cert-manager, cluster-config, mariadb, back-end·front-end·monitoring(ApplicationSet)
+    │   ├── demo/           # argocd-bootstrap, external-secrets, cert-manager, cluster-config, mariadb, back-end·front-end·monitoring(ApplicationSet), loki, alloy
     │   └── prod/           # (미작성)
     ├── charts/             # 자체 Helm 차트: cluster-config, front-end, back-end, mariadb(공식 이미지 기반 StatefulSet), monitoring-config
     └── values/
@@ -241,13 +241,15 @@ PRINT_ONLY=1 infra/scripts/bootstrap-demo-argocd.sh    # 노드에서 실행할 
 - **경로:** Traefik → 앱 경로가 NetworkPolicy를 통과했다. `api.` 주소에서는 문서와 채널 API(서명 없으면 401)만 열리고 운영자 API·시뮬레이터 수신 주소·`/metrics`·헬스체크는 404였다.
 - **demo 노드 (2026-10-11):** 실제 발급자 `letsencrypt`로 `fe.`·`api.` 인증서가 발급됐다.
 
-## gitops: 모니터링 (`apps/demo/monitoring.yaml`)
+## gitops: 모니터링 (`apps/demo/monitoring.yaml`, `loki.yaml`, `alloy.yaml`)
 
 | 파일 | 내용 |
 |---|---|
 | [`apps/demo/monitoring.yaml`](gitops/apps/demo/monitoring.yaml) | ApplicationSet(wave 1). kube-prometheus-stack 92.3.0 + `monitoring-config`. `grafana.<도메인>`과 root_url을 클러스터 Secret annotation에서 넣는다 |
 | [`values/demo/monitoring.yaml`](gitops/values/demo/monitoring.yaml) | Prometheus 3.13.4(LTS) 7일·3GB 보관(PVC 5Gi), Alertmanager와 k3s 내장 컴포넌트 수집 끔, Grafana 익명 Viewer·HTTPS |
-| [`charts/monitoring-config`](gitops/charts/monitoring-config) | Grafana 관리자 비밀번호(ESO Password 생성기, 한 번만 생성), Restella 대시보드(ConfigMap) |
+| [`charts/monitoring-config`](gitops/charts/monitoring-config) | Grafana 관리자 비밀번호(ESO Password 생성기, 한 번만 생성), Restella 대시보드(ConfigMap), Loki NetworkPolicy |
+| [`apps/demo/loki.yaml`](gitops/apps/demo/loki.yaml), [`values/demo/loki.yaml`](gitops/values/demo/loki.yaml) | Application(wave 1). grafana-community/loki 18.15.1(Loki 3.7.8) 단일 바이너리, 파일시스템 저장(PVC 3Gi), 7일 보관(compactor). 게이트웨이·캐시·카나리 끔 |
+| [`apps/demo/alloy.yaml`](gitops/apps/demo/alloy.yaml), [`values/demo/alloy.yaml`](gitops/values/demo/alloy.yaml) | Application(wave 1). grafana/alloy 1.13.1(Alloy 1.20.1) Deployment 1개. restella 네임스페이스의 컨테이너 로그를 Kubernetes API로 읽어 색상 코드를 지우고 Loki로 보낸다. 레이블: `namespace`, `pod`, `container`, `app` |
 | back-end 차트 `monitoring.serviceMonitor` | Prometheus가 back-end `/metrics`를 30초마다 수집. back-end NetworkPolicy가 monitoring의 Prometheus만 3000 포트를 더 허용 |
 
 | 결정 | 이유 |
@@ -258,8 +260,20 @@ PRINT_ONLY=1 infra/scripts/bootstrap-demo-argocd.sh    # 노드에서 실행할 
 | Alertmanager 끔 | 알림을 받을 곳(메일·슬랙)이 없다 |
 | k3s 내장 컴포넌트(컨트롤러 매니저·스케줄러·kube-proxy·etcd) 수집 끔 | k3s는 이들을 한 프로세스에 넣어 따로 수집할 수 없다. 켜 두면 수집 실패 경보만 쌓인다 |
 | Prometheus 7일·3GB | 데이터 EBS(10GiB)를 MariaDB와 나눠 쓴다 |
+| Loki는 오픈소스용 `grafana-community/loki` 차트 | 2026-03에 오픈소스 차트가 이 저장소로 옮겨졌고, `grafana/loki`는 Enterprise(GEL)용 유지보수만 한다 |
+| Loki 단일 바이너리 + 파일시스템 | 노드 한 대, 로그 양이 적다. S3를 쓰면 버킷과 권한이 더 필요하다. 단순 확장(SimpleScalable) 모드는 Loki 4에서 없어진다 |
+| 로그는 restella 네임스페이스만 | Grafana는 로그인 없이 읽을 수 있고, Viewer도 데이터 소스에 직접 질의할 수 있다. 접속자 IP가 남는 Traefik 접근 로그 등은 모으지 않는다. 앱 로그에는 오류 스택, 요청 경로, 시작 로그만 있고 개인정보는 없다 |
+| Alloy는 API로 로그를 읽는 Deployment, 권한은 restella의 Pod·Pod 로그 읽기만 | 노드 디렉토리(hostPath)를 마운트하지 않아 root가 필요 없다(이미지의 alloy 사용자로 실행). 차트 기본 권한에는 클러스터 전체 Secret 읽기가 들어 있어 Role로 바꿨다. 사용 통계 전송은 끈다 |
+| Loki로 들어오는 연결은 Alloy·Grafana·Loki 자신만 (NetworkPolicy) | Loki에는 인증이 없다(`auth_enabled: false`) |
 
-**Restella 대시보드 패널:** 확정·거절·오버부킹 충돌(24시간), 채널 동기화 지연 p50/p95(목표 5초), 채널별 동기화 실패(재시도·최종), 경로별 API 응답 시간 p95(목표 300ms).
+**Restella 대시보드 패널:** 확정·거절·오버부킹 충돌(24시간), 채널 동기화 지연 p50/p95(목표 5초), 채널별 동기화 실패(재시도·최종), 경로별 API 응답 시간 p95(목표 300ms), back-end 경고·오류 로그, restella 전체 로그.
+
+**검증 (로컬 k3s v1.36.5, 2026-10-13):** Loki·Alloy를 같은 values로 설치하고 restella 네임스페이스에 로그를 찍는 Pod를 띄웠다.
+- `{namespace="restella", app="back-end"} |~ "(WARN|ERROR)"`로 로그가 조회됐고, 색상 코드는 지워졌다.
+- default 네임스페이스에도 로그를 찍었지만 Loki의 `namespace` 값은 `restella` 하나뿐이었다.
+- Grafana 레이블 Pod에서는 Loki에 질의됐고, 레이블 없는 Pod는 연결이 거부됐다(NetworkPolicy).
+- Alloy는 uid 473(alloy)으로 실행되고 경고·오류 로그가 없었다. 메모리는 Loki 약 60MB, Alloy 약 40MB.
+- kube-prometheus-stack 92.3.0을 렌더링해 Grafana 데이터 소스에 Loki(`uid: loki`)가 들어가는 것을 확인했다.
 
 ## gitops: front-end (`gitops/charts/front-end`)
 
@@ -468,4 +482,4 @@ terraform -chdir=infra/terraform/envs/demo output -raw github_actions_role_arn |
 
 ## 참고
 
-Grafana Helm 차트는 `grafana-community` 저장소로 옮겨졌다. kube-prometheus-stack 92.3.0도 `oci://ghcr.io/grafana-community/helm-charts`를 참조한다.
+Grafana와 Loki의 Helm 차트는 `grafana-community` 저장소로 옮겨졌다(Alloy는 `grafana` 저장소에 남아 있다). kube-prometheus-stack 92.3.0도 `oci://ghcr.io/grafana-community/helm-charts`를 참조한다.

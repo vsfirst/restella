@@ -1,0 +1,36 @@
+# Loki: 로그 저장소. Grafana에서 restella 앱 로그를 본다 (values/demo/loki.yaml)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1" # monitoring(1)과 함께. 앱(2)이 뜨기 전에 수집 준비를 마친다
+spec:
+  project: default
+  sources:
+    - repoURL: https://grafana-community.github.io/helm-charts
+      chart: loki
+      targetRevision: 18.15.1
+      helm:
+        releaseName: loki
+        valueFiles:
+          - $values/infra/gitops/values/demo/loki.yaml
+    - repoURL: https://github.com/vsfirst/restella.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

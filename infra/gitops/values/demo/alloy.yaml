@@ -1,0 +1,79 @@
+# demo 로그 수집기 (grafana/alloy 1.13.1, Alloy 1.20.1).
+# restella 네임스페이스의 컨테이너 로그만 Kubernetes API로 읽어 Loki에 보낸다.
+# - API로 읽으므로 노드 디렉토리(hostPath)를 마운트하지 않고, DaemonSet 대신 Deployment 1개로 충분하다
+# - 접속자 IP가 남는 Traefik 접근 로그 등 다른 네임스페이스는 모으지 않는다. Grafana는 로그인 없이 읽을 수 있기 때문이다
+alloy:
+  configMap:
+    content: |
+      discovery.kubernetes "pods" {
+        role = "pod"
+        namespaces {
+          names = ["restella"]
+        }
+      }
+
+      // Loki 레이블: namespace, pod, container, app(app.kubernetes.io/name)
+      discovery.relabel "pods" {
+        targets = discovery.kubernetes.pods.targets
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_name"]
+          target_label  = "container"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+          target_label  = "app"
+        }
+      }
+
+      loki.source.kubernetes "pods" {
+        targets    = discovery.relabel.pods.output
+        forward_to = [loki.process.pods.receiver]
+      }
+
+      // NestJS 로거의 색상 코드를 지운다
+      loki.process "pods" {
+        stage.decolorize {}
+        forward_to = [loki.write.default.receiver]
+      }
+
+      loki.write "default" {
+        endpoint {
+          url = "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+        }
+      }
+  # 사용 통계를 Grafana Labs에 보내지 않는다
+  enableReporting: false
+  # 노드 디렉토리를 읽지 않으므로 root가 필요 없다. 이미지에 있는 alloy 사용자(473)로 실행한다
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 473
+    runAsGroup: 473
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+    seccompProfile:
+      type: RuntimeDefault
+  resources:
+    requests: { cpu: 20m, memory: 64Mi }
+    limits: { memory: 256Mi }
+
+controller:
+  type: deployment
+  replicas: 1
+
+# 차트 기본 권한(클러스터 전체 Secret·ConfigMap 읽기 등) 대신, restella 네임스페이스의 Pod와 Pod 로그 읽기만 준다
+rbac:
+  namespaces: [restella]
+  rules:
+    - apiGroups: [""]
+      resources: ["pods", "pods/log"]
+      verbs: ["get", "list", "watch"]
+  clusterRules: []

@@ -38,4 +38,4 @@
 
 ## 관측
 
-back-end는 예약 확정·거절·충돌 건수와 동기화 지연을 `/metrics`로 Prometheus 형식으로 내보낸다. 이 지표를 수집하는 Prometheus와 Grafana 대시보드는 아직 배포하지 않았다(남은 일). [문제 정의](../1-planning/problem.md#목표)의 목표 1(충돌 창 축소)과 3(즉시 감지)을 이 지표로 추적할 계획이다.
+back-end는 예약 확정·거절·충돌 건수와 동기화 지연을 `/metrics`로 Prometheus 형식으로 내보낸다. demo에서는 Prometheus가 이 지표를 수집하고, Alloy가 restella 네임스페이스의 컨테이너 로그를 Loki로 보낸다. Grafana의 Restella 대시보드에서 지표와 로그를 함께 본다([infra 설계](../../infra/README.md#gitops-모니터링-appsdemomonitoringyaml-lokiyaml-alloyyaml)). [문제 정의](../1-planning/problem.md#목표)의 목표 1(충돌 창 축소)과 3(즉시 감지)을 이 지표로 추적한다.
