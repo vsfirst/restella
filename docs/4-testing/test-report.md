@@ -103,6 +103,12 @@
 - **찾은 문제 I1:** `use_spot = false`가 plan에서 "변경 없음"이었다. 온디맨드 전환에는 노드 교체가 필요하다.
 - **찾은 문제 I2:** 전환할 때 스팟 요청을 먼저 취소했더니, 볼륨을 떼기 전 인스턴스 중지를 AWS가 거부해 apply가 실패했다. 이미 중지된 인스턴스를 직접 종료한 뒤 apply와 Argo CD 부트스트랩을 다시 해 복구했다(새 클러스터, Application 9개 Synced/Healthy, 인증서 3개 발급).
 
+## 로그 수집 (2026-10-13)
+
+- **로컬 k3s:** Loki·Alloy를 demo와 같은 values로 설치했다. restella 로그만 수집되고(다른 네임스페이스 제외), 색상 코드가 지워지고, 허용하지 않은 Pod는 Loki에 접근하지 못했다. Alloy는 root가 아닌 사용자로 실행됐다.
+- **demo:** Loki에 back-end·front-end·mariadb 로그가 들어왔다.
+- **찾은 문제 I3~I5:** Grafana와 Argo CD application-controller가 메모리 부족으로 재시작했다(한도 상향). Grafana 관리자 비밀번호가 Secret과 달라져 사이드카의 데이터 소스 다시 읽기가 실패했다(Pod 재생성으로 복구). 세부 내용은 [infra 설계](../../infra/README.md#gitops-모니터링-appsdemomonitoringyaml-lokiyaml-alloyyaml)에 있다.
+
 ## 남은 검증
 
 - 인프라: demo 환경에서 응답 시간 p95(AC-N02-1), 이전 커밋으로 되돌리기(AC-N06-2), 스냅샷 7개 보관(AC-N07-2).

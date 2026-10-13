@@ -255,7 +255,7 @@ PRINT_ONLY=1 infra/scripts/bootstrap-demo-argocd.sh    # 노드에서 실행할 
 | 결정 | 이유 |
 |---|---|
 | Grafana는 익명 읽기 전용(Viewer), 편집은 관리자만 (사람 결정) | 면접관이 계정 없이 대시보드를 본다. 관리자 비밀번호를 나눠 줄 필요가 없다. 대신 대시보드 쿼리로 클러스터 지표(Pod 이름 등)를 누구나 볼 수 있다 |
-| 관리자 비밀번호는 ESO Password 생성기로 클러스터 안에서 한 번만(`CreatedOnce`) | 차트 기본값(`prom-operator`)을 쓰지 않는다. Secrets Manager의 `fe`·`be` 구조를 늘리지 않는다. 읽기: `kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' \| base64 -d` |
+| 관리자 비밀번호는 ESO Password 생성기로 클러스터 안에서 한 번만(`CreatedOnce`) | 차트 기본값(`prom-operator`)을 쓰지 않는다. Secrets Manager의 `fe`·`be` 구조를 늘리지 않는다. 읽기: `kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' \| base64 -d`. **화면에서 관리자 비밀번호를 바꾸지 않는다:** 사이드카가 이 Secret 값으로 Grafana에 데이터 소스·대시보드 다시 읽기를 요청하므로, 값이 달라지면 새 데이터 소스가 로드되지 않는다(2026-10-13 실제로 겪음). Grafana Pod를 다시 만들면 Secret 값으로 돌아간다 |
 | 대시보드는 코드(ConfigMap)로, Grafana 저장소는 두지 않음 | 화면에서 바꾼 내용은 재시작하면 사라진다. 대시보드 변경도 커밋으로 한다 |
 | Alertmanager 끔 | 알림을 받을 곳(메일·슬랙)이 없다 |
 | k3s 내장 컴포넌트(컨트롤러 매니저·스케줄러·kube-proxy·etcd) 수집 끔 | k3s는 이들을 한 프로세스에 넣어 따로 수집할 수 없다. 켜 두면 수집 실패 경보만 쌓인다 |
@@ -274,6 +274,11 @@ PRINT_ONLY=1 infra/scripts/bootstrap-demo-argocd.sh    # 노드에서 실행할 
 - Grafana 레이블 Pod에서는 Loki에 질의됐고, 레이블 없는 Pod는 연결이 거부됐다(NetworkPolicy).
 - Alloy는 uid 473(alloy)으로 실행되고 경고·오류 로그가 없었다. 메모리는 Loki 약 60MB, Alloy 약 40MB.
 - kube-prometheus-stack 92.3.0을 렌더링해 Grafana 데이터 소스에 Loki(`uid: loki`)가 들어가는 것을 확인했다.
+
+**demo 배포 (2026-10-13):** `loki`·`alloy` Application Synced/Healthy, Alloy uid 473, Loki에 restella의 back-end·front-end·mariadb 로그가 들어왔다. 배포하며 문제 3개가 드러났다.
+1. **Grafana OOM:** 평상시 약 350Mi인데 한도가 384Mi라, 데이터 소스가 바뀌어 재시작할 때 메모리 부족으로 종료됐다. 한도를 640Mi로 올렸다.
+2. **Argo CD application-controller OOM:** 평상시 약 360Mi인데, Loki·Alloy를 처음 동기화할 때 768Mi 한도를 넘었다. 한도를 1Gi로 올렸다(`bootstrap/demo/argocd.yaml`).
+3. **Loki 데이터 소스 미로드:** 사이드카의 다시 읽기 요청이 403이었다. Grafana DB의 관리자 비밀번호가 Secret 값과 달라 basic 인증이 실패하고 익명으로 처리됐다. 위 1의 변경으로 Grafana Pod가 새로 만들어지면 Secret 값으로 다시 초기화된다.
 
 ## gitops: front-end (`gitops/charts/front-end`)
 

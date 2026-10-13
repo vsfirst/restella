@@ -48,9 +48,10 @@ spec:
 
     # t4g.large(8GiB) 한 대에 앱, DB, 모니터링과 함께 돈다
     controller:
+      # 평상시 약 360Mi. 앱을 새로 동기화할 때 순간 사용량이 768Mi를 넘어 OOM으로 재시작했다(2026-10-13, Loki·Alloy 추가)
       resources:
-        requests: { cpu: 100m, memory: 256Mi }
-        limits: { memory: 768Mi }
+        requests: { cpu: 100m, memory: 384Mi }
+        limits: { memory: 1Gi }
     repoServer:
       resources:
         requests: { cpu: 50m, memory: 128Mi }
