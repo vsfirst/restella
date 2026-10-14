@@ -40,7 +40,7 @@ infra/
 │   ├── global/             # 계정 공용: Route 53 호스팅 영역(레코드는 각 환경이 관리), GitHub Actions OIDC 공급자
 │   ├── modules/
 │   │   ├── network/        # VPC, 서브넷, 라우팅, 인터넷 게이트웨이, (선택) NAT Gateway·S3 엔드포인트
-│   │   ├── k3s-node/       # EC2(스팟 선택), SSM용 IAM, 데이터 EBS와 일일 스냅샷, k3s 설치 user-data, (demo) EIP
+│   │   ├── k3s-node/       # EC2(스팟 선택), SSM용 IAM, 데이터 EBS와 일일 스냅샷(선택), k3s 설치 user-data, (demo) EIP
 │   │   ├── ecr/            # 앱별 ECR 저장소, 수명 주기 정책
 │   │   └── alb/            # (미작성) prod 전용: ALB, ACM 인증서, 대상 그룹
 │   ├── envs/
@@ -74,7 +74,7 @@ infra/
 | 인스턴스 | t4g.large 온디맨드(2026-10-13부터. `use_spot = true`면 스팟 `persistent` 요청, 회수 시 `stop`), CPU 크레딧 `standard` |
 | AMI | SSM 공개 파라미터 `al2023-ami-kernel-6.18-arm64`. 새 AMI가 나와도 운영 중인 노드는 교체하지 않는다(`ignore_changes`) |
 | 디스크 | 루트 gp3 20GiB와 데이터 gp3 10GiB, 모두 암호화. 데이터 볼륨은 인스턴스와 수명을 분리해 k3s 로컬 볼륨 경로(`/var/lib/rancher/k3s/storage`)에 마운트한다 |
-| 백업 | Data Lifecycle Manager가 데이터 볼륨을 매일 KST 03:00에 스냅샷하고 7개를 보관한다 |
+| 백업 | 모듈 기본값은 Data Lifecycle Manager가 데이터 볼륨을 매일 KST 03:00에 스냅샷하고 7개를 보관한다(`enable_snapshots`). **demo는 끈다:** 데이터가 시드로 다시 만들 수 있는 가짜 값이다(사람 결정, 2026-10-15). 그전에 만든 스냅샷도 지웠다 |
 | 접속 | SSM Session Manager만 쓴다. SSH 키와 22번 포트는 없다 |
 | IMDS | IMDSv2만 허용한다. 모듈 기본 홉 제한은 1(Pod가 인스턴스 역할에 접근 불가)이고, demo는 External Secrets Operator를 위해 2로 올린다. 대신 cluster-config가 지정한 네임스페이스(restella, argocd, kube-system, cert-manager, monitoring)마다 NetworkPolicy로 메타데이터 주소를 막는다. 새 네임스페이스는 직접 추가해야 한다([ADR-0005 결정 3](../docs/adr/0005-cluster-bootstrap.md#결정-3-인스턴스-메타데이터는-네임스페이스마다-networkpolicy로-막는다). demo 노드에서 back-end Pod의 메타데이터 접근이 막히는 것을 확인했다, 2026-10-13) |
 | k3s | 버전 고정(`v1.36.5+k3s1`), Secret 저장 시 암호화(`secrets-encryption`), kubeconfig 권한 0600 |
@@ -455,7 +455,7 @@ terraform -chdir=infra/terraform/envs/demo output -raw github_actions_role_arn |
 | Pod | 실패한 Pod 없음. ExternalSecret 5개 동기화, 인증서 3개(`fe.`·`api.`·`grafana.`) Ready |
 | 외부 접속 | `fe.`는 로그인으로 이동, `/api/health` 정상. `api.`는 채널 API와 API 문서만 공개하고 `/metrics`·운영자 API는 404. HTTP는 301로 HTTPS 이동 |
 | 메타데이터 차단 | back-end Pod에서 `169.254.169.254` 접근이 막힌다 |
-| 스냅샷 | 데이터 볼륨 스냅샷이 매일 KST 03시 무렵 만들어진다(10-12, 10-13 두 개. 7개 보관은 아직 확인 못 함) |
+| 스냅샷 | 데이터 볼륨 스냅샷이 매일 KST 03시 무렵 만들어졌다(10-12, 10-13). 이후 demo에서는 스냅샷을 끄고 지웠다(2026-10-15) |
 | 리소스 | 메모리 7.6GiB 중 3.4GiB 사용, 루트 디스크 43%, 데이터 디스크 12% |
 
 **스팟 회수가 잦다.** 모든 Pod의 재시작 횟수가 약 48인데 노드 가동 시간은 2시간 반이었다. 부팅 기록과 CloudTrail(`StopInstances`, 호출자 `InstanceTermination`)로 AWS의 스팟 회수임을 확인했다.
@@ -483,7 +483,7 @@ terraform -chdir=infra/terraform/envs/demo output -raw github_actions_role_arn |
 
 - 저장소가 public이므로 비밀값·민감 정보·개인정보는 Git에 절대 두지 않는다. 계정 ID와 state 버킷 이름도 코드에 적지 않고 실행 시점에 읽거나 커밋하지 않는 파일에 둔다.
 - 운영 비밀값은 Secrets Manager의 `restella-demo`에 JSON으로 둔다. Terraform은 그릇만 만들고 값은 사람이 직접 넣는다. 클러스터에는 External Secrets Operator가 전달한다.
-- 데이터는 EBS 스냅샷으로 보호한다.
+- 운영 데이터는 EBS 스냅샷으로 보호한다(모듈 기본값). demo는 가짜 데이터라 스냅샷을 두지 않는다.
 
 ## 참고
 

@@ -25,6 +25,9 @@ module "k3s_node" {
   k3s_version   = var.k3s_version
   associate_eip = true
 
+  # demo 데이터는 시드로 다시 만들 수 있는 가짜 값이라 스냅샷을 두지 않는다 (사람 결정, 2026-10-15)
+  enable_snapshots = false
+
   # External Secrets Operator(Pod)가 노드 역할로 Secrets Manager와 ECR 토큰에 접근하려면 홉 2가 필요하다.
   # 다른 Pod의 메타데이터 접근은 NetworkPolicy로 막는다 (infra/gitops에서 구성).
   imds_hop_limit      = 2

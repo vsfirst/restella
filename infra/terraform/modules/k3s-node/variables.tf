@@ -110,6 +110,12 @@ variable "secret_arns" {
   default     = []
 }
 
+variable "enable_snapshots" {
+  description = "데이터 볼륨을 매일 스냅샷할지. 끄면 정책을 만들지 않으며, 이미 만든 스냅샷은 지우지 않는다"
+  type        = bool
+  default     = true
+}
+
 variable "snapshot_retention_count" {
   description = "데이터 볼륨 일일 스냅샷 보관 개수"
   type        = number

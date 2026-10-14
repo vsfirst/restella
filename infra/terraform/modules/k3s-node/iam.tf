@@ -76,7 +76,7 @@ resource "aws_iam_instance_profile" "node" {
   role = aws_iam_role.node.name
 }
 
-# 데이터 볼륨 일일 스냅샷 (Data Lifecycle Manager)
+# 데이터 볼륨 일일 스냅샷 (Data Lifecycle Manager). enable_snapshots가 false면 만들지 않는다
 
 data "aws_iam_policy_document" "dlm_assume" {
   statement {
@@ -90,18 +90,24 @@ data "aws_iam_policy_document" "dlm_assume" {
 }
 
 resource "aws_iam_role" "dlm" {
+  count = var.enable_snapshots ? 1 : 0
+
   name               = "${var.name}-dlm"
   assume_role_policy = data.aws_iam_policy_document.dlm_assume.json
 }
 
 resource "aws_iam_role_policy_attachment" "dlm" {
-  role       = aws_iam_role.dlm.name
+  count = var.enable_snapshots ? 1 : 0
+
+  role       = aws_iam_role.dlm[0].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
 }
 
 resource "aws_dlm_lifecycle_policy" "data" {
+  count = var.enable_snapshots ? 1 : 0
+
   description        = "${var.name} data volume daily snapshot"
-  execution_role_arn = aws_iam_role.dlm.arn
+  execution_role_arn = aws_iam_role.dlm[0].arn
   state              = "ENABLED"
 
   policy_details {
