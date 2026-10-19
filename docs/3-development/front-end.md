@@ -48,5 +48,5 @@
 ## 남은 일
 
 - 로그인 시도 제한이 IP 기준이라 BFF 뒤에서는 모든 운영자가 한도를 함께 쓴다([front-end 설계 "알려진 제약"](../../front-end/README.md#인증-흐름)).
-- (완료) Dockerfile(arm64)과 CI(`.github/workflows/demo-front-end.yaml`)를 작성하고 demo에 배포했다. 콘솔 주소는 `fe.<도메인>`이다([demo 사용 안내](../../DEMO.md)).
+- (완료) Dockerfile(arm64)과 CI(`.github/workflows/demo-front-end.yaml`)를 작성하고 demo에 배포했다. 콘솔 주소는 `fe.<도메인>`이었다(2026-10-19 demo 종료. [demo 사용 안내](../../DEMO.md)).
 - 코드 리뷰(`/code-review`)를 하고 [코드 리뷰 기록](code-review.md)을 남긴다.

@@ -21,7 +21,7 @@ ADR과 AI 활용 기록은 모든 단계에 걸친 문서라 `docs` 바로 아�
 | P1 | 설계 | 도메인 모델·ERD, API 명세, 화면 설계(HTML 목업), ADR | 설계 확정 | 완료 (2026-10-09 확정) |
 | P2 | back-end | 재고·예약·취소·중복 처리·충돌 + 불변식 테스트 | 테스트·리뷰 결과 | 구현·테스트 완료, 코드 리뷰 대기 |
 | P3 | front-end | 운영자 콘솔 + 시뮬레이터 | 데모 시나리오 | 구현·테스트 완료, 코드 리뷰 대기 |
-| P4 | infra | Terraform, k3s, Helm 차트, Argo CD, Grafana, CI | | 진행 중 (P1보다 먼저 시작). Terraform bootstrap·global(Route 53, GitHub OIDC)·demo 모두 적용. 앱별 CI(테스트 → arm64 빌드 → ECR → 다이제스트 커밋), Helm 차트 5개, Argo CD·ESO·cert-manager로 demo 배포 완료(2026-10-11, HTTPS, Application 9개 Synced/Healthy), Prometheus·Grafana 모니터링과 Restella 대시보드. prod 코드, demo 부하·스팟 복구·되돌리기 검증 남음 |
+| P4 | infra | Terraform, k3s, Helm 차트, Argo CD, Grafana, CI | | 진행 중 (P1보다 먼저 시작). Terraform bootstrap·global(Route 53, GitHub OIDC)·demo 모두 적용. 앱별 CI(테스트 → arm64 빌드 → ECR → 다이제스트 커밋), Helm 차트 5개, Argo CD·ESO·cert-manager로 demo 배포 완료(2026-10-11, HTTPS, Application 9개 Synced/Healthy), Prometheus·Grafana 모니터링과 Restella 대시보드. 스팟 회수 복구 확인, Loki·Alloy 로그 수집 추가(2026-10-13). 면접 후 demo AWS 리소스 전부 삭제(2026-10-19). prod 코드, demo 부하·되돌리기 검증은 하지 않음 |
 | P5 | 마무리 | 문서 정리, 데모, 회고와 한계 | 제출 전 최종 점검 | |
 
 ## P0 체크리스트

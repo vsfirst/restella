@@ -8,7 +8,7 @@ Restella를 AWS EC2 위의 k3s 클러스터에 배포하는 인프라 코드다.
 - demo 노드의 OS와 인스턴스 결정: [ADR-0002](../docs/adr/0002-demo-node-os-and-instance.md)
 - 배포 파이프라인과 비밀값 전달: [ADR-0003](../docs/adr/0003-delivery-pipeline.md)
 - 클러스터 부트스트랩과 공통 구성: [ADR-0005](../docs/adr/0005-cluster-bootstrap.md)
-- 직접 써 보는 방법: [demo 사용 안내](../DEMO.md)
+- 직접 써 보는 방법: [demo 사용 안내](../DEMO.md) (demo는 2026-10-19에 내림. 기록용)
 - 비밀값 원칙: [보안](../docs/2-design/security.md)
 
 ## 환경
@@ -16,7 +16,7 @@ Restella를 AWS EC2 위의 k3s 클러스터에 배포하는 인프라 코드다.
 | | demo | prod (실무용) |
 |---|---|---|
 | 목적 | 과제 심사용 실제 배포 | 실무 기준 설계를 코드로 제시 |
-| AWS 반영 | **배포함** (2026-10-11) | **배포하지 않음** (비용 문제로 설계만 둔다. 2026-10-11 현재 코드는 작성하지 않았다) |
+| AWS 반영 | **배포 후 정리함** (2026-10-11 배포, 2026-10-19 전부 삭제. [demo 정리](#demo-정리-2026-10-19)) | **배포하지 않음** (비용 문제로 설계만 둔다. 2026-10-11 현재 코드는 작성하지 않았다) |
 | 네트워크 | 퍼블릭 서브넷 1개, EC2에 EIP | 퍼블릭 서브넷 2개(ALB, NAT Gateway), 프라이빗 서브넷 2개(EC2) |
 | HTTPS | Traefik + cert-manager + Let's Encrypt | ALB + ACM |
 | EC2 노출 | 인터넷에 직접 노출. 보안 그룹으로 80·443만 허용 | 공인 IP 없음. ALB에서 오는 트래픽만 허용 |
@@ -478,6 +478,24 @@ terraform -chdir=infra/terraform/envs/demo output -raw github_actions_role_arn |
 - 데이터 볼륨과 EIP(공인 IP)는 남는다. 다만 새 클러스터는 PVC를 새로 만들므로 DB는 빈 상태에서 마이그레이션·시드로 다시 시작한다(이전 데이터 디렉토리는 볼륨에 남는다).
 - Grafana 관리자 비밀번호처럼 클러스터 안에서 만든 값도 새로 생긴다.
 - 인증서는 cert-manager가 다시 발급받는다.
+
+## demo 정리 (2026-10-19)
+
+면접이 끝나 비용이 나오지 않도록 모든 AWS 리소스를 지웠다(사람 결정). 코드는 그대로 남아 [demo 적용 방법](#demo-적용-방법)대로 다시 만들 수 있다.
+
+| 순서 | 대상 | 결과 |
+|---|---|---|
+| 1 | 인스턴스 중지 (2026-10-15), demo 스냅샷 끄기와 기존 스냅샷 삭제 | `enable_snapshots = false`, 스냅샷 0개 |
+| 2 | `envs/demo` destroy | 28개 삭제: EC2·볼륨·EIP, VPC, ECR(이미지 포함), Secrets Manager, IAM 역할, DNS 레코드 |
+| 3 | GitHub Actions `demo-back-end`·`demo-front-end` 비활성화 | 역할이 없어 push마다 실패하지 않게 |
+| 4 | `global` destroy → 상위 DNS(Cloudflare)의 NS 위임 삭제 | Route 53 영역, GitHub OIDC 공급자 삭제. 영역을 먼저 지워 위임이 지워진 영역을 가리키는 상태가 잠시 생겼다(서브도메인 탈취 위험). 확인 후 Cloudflare API로 NS 레코드 4개를 지우고, Cloudflare 네임서버에서 위임이 사라진 것을 확인했다. **다음에는 위임을 먼저 지운다** |
+| 5 | `bootstrap` destroy | state 버킷 삭제 |
+
+- **확인:** 인스턴스·볼륨·EIP·스냅샷·NAT·로드 밸런서·ECR·VPC·Route 53 영역·OIDC 공급자·restella IAM 역할·state 버킷 모두 0개.
+- **남은 것:** Secrets Manager `restella-demo`는 7일 복구 기간 뒤(2026-10-26) 자동으로 지워진다.
+- **삭제 보호:** `global`의 호스팅 영역과 `bootstrap`의 state 버킷에는 `prevent_destroy`가 있다. 정리할 때만 잠시 끄고 지운 뒤 코드를 되돌렸다.
+- **state 버킷:** 버전 관리가 켜져 있어 `force_destroy`가 없으면 `BucketNotEmpty`로 실패한다. 설정 리소스 6개가 먼저 지워진 뒤 실패했다. 그래서 `force_destroy = true`를 버킷에만 `-target`으로 반영하고 다시 destroy했다.
+- **다시 만들 때:** bootstrap → global → demo 순서로 적용한 뒤, 상위 DNS에 새 NS를 위임하고, 비밀값을 채우고, Argo CD를 부트스트랩하고, 워크플로를 다시 켠다.
 
 ## 운영 원칙
 
